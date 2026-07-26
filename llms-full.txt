@@ -1,0 +1,186 @@
+# pdf-mcp — Full LLM Reference
+
+Full-stack PDF intelligence MCP server. Extract, manipulate, annotate, convert, validate, and RAG-search PDFs.
+
+## Quick Start
+
+```bash
+uv sync
+cp .env.example .env
+# Start backend
+uv run python run_server.py --mode http --host 127.0.0.1 --port 11131
+# Start frontend (separate terminal)
+cd webapp && bun install && bun run dev
+```
+
+## MCP Tool Reference
+
+### pdf_extract
+
+Extract content and metadata from PDFs.
+
+| Operation | Parameters | Returns |
+|-----------|-----------|---------|
+| `text` | path, pages (optional page range) | `{text, pages, page_count}` |
+| `images` | path, pages | `{images: [{page, index, width, height, path, ext}]}` |
+| `tables` | path, pages | `{tables: [{page, rows, cols, headers, data}]}` |
+| `metadata` | path | `{metadata: {title, author, subject, page_count, file_size, ...}}` |
+| `fonts` | path | `{fonts: [{name, type, encoding, embedded, size}]}` |
+| `links` | path | `{links: [{page, uri, page_target, rect}]}` |
+| `outline` | path | `{outline: [{title, level, page, children}]}` |
+
+### pdf_manipulate
+
+Modify PDF structure and properties.
+
+| Operation | Parameters | Returns |
+|-----------|-----------|---------|
+| `merge` | paths (list of PDF paths) | `{path, pages}` |
+| `split` | path, output_dir, ranges (optional page ranges) | `{files: [path, ...]}` |
+| `rotate` | path, pages (range), angle (default 90) | `{path}` |
+| `reorder` | path, new_order (1-indexed list) | `{path}` |
+| `delete_pages` | path, page_list (1-indexed) | `{path}` |
+| `compress` | path, quality (1-100, default 85) | `{path, original_size, compressed_size}` |
+| `encrypt` | path, password | `{path}` |
+| `decrypt` | path, password | `{path}` |
+| `optimize` | path | `{path, original_size, optimized_size}` |
+
+### pdf_annotate
+
+Add annotations and markup to PDFs.
+
+| Operation | Parameters | Returns |
+|-----------|-----------|---------|
+| `watermark` | path, text or image_path, opacity (0.3), position | `{path}` |
+| `stamp` | path, text, x, y | `{path}` |
+| `highlight` | path, search_text, color (#FFFF00) | `{path, occurrences}` |
+| `underline` | path, search_text | `{path, occurrences}` |
+| `header_footer` | path, header, footer, font_size | `{path}` |
+| `page_numbers` | path, start, position, font_size | `{path}` |
+
+### pdf_forms
+
+Handle interactive form fields.
+
+| Operation | Parameters | Returns |
+|-----------|-----------|---------|
+| `list_fields` | path | `{fields: [{name, type, value, page, rect}]}` |
+| `fill` | path, fields ({name: value}) | `{path, filled}` |
+| `flatten` | path | `{path}` |
+| `export_data` | path | `{data: {field_name: value}}` |
+
+### pdf_convert
+
+Convert between PDF and other formats.
+
+| Operation | Parameters | Returns |
+|-----------|-----------|---------|
+| `to_markdown` | path | `{markdown, pages}` |
+| `to_images` | path, fmt (png/jpeg), dpi (200) | `{images: [{page, path}]}` |
+| `to_html` | path | `{html}` |
+| `from_html` | html | `{path, pages}` |
+| `from_markdown` | markdown | `{path, pages}` |
+| `from_images` | paths (image file paths) | `{path, pages}` |
+
+### pdf_validate
+
+Audit PDF quality and compliance.
+
+| Operation | Parameters | Returns |
+|-----------|-----------|---------|
+| `pdfa` | path | `{is_pdfa, details}` |
+| `structure` | path | `{has_tags, headings, paragraphs, issues}` |
+| `accessibility` | path | `{score (0-100), issues}` |
+| `integrity` | path | `{intact, pages_readable, warnings}` |
+| `compare` | path_a, path_b | `{same_page_count, text_similarity, diffs}` |
+
+### pdf_rag
+
+Build and query a RAG index over PDF content.
+
+| Operation | Parameters | Returns |
+|-----------|-----------|---------|
+| `chunk` | path, strategy (recursive/fixed), chunk_size (1000), overlap (200) | `{chunks, doc_id}` |
+| `index` | path, strategy, chunk_size, overlap | `{chunks_indexed, doc_id}` |
+| `search` | query, limit (10) | `{results: [{doc_id, chunk_id, text, _distance}]}` |
+| `list_documents` | (none) | `{documents: [{doc_id, chunk_count}]}` |
+| `delete_index` | doc_id | `{success}` |
+
+## Architecture
+
+```
+pdf_mcp/
+├── server.py          FastMCP app + FastAPI REST + CORS
+├── config.py          Env-based configuration
+├── models.py          Pydantic models + operation literals
+├── tools/             7 portmanteau tool files
+│   ├── extract.py
+│   ├── manipulate.py
+│   ├── annotate.py
+│   ├── forms.py
+│   ├── convert.py
+│   ├── validate.py
+│   └── rag.py
+├── services/          Core engines
+│   ├── extractor.py   PyMuPDF text/image/table/metadata extraction
+│   ├── manipulator.py pypdf merge/split/rotate/compress/encrypt
+│   ├── converter.py   PDF to/from Markdown/HTML/images
+│   ├── chunker.py     Text chunking strategies
+│   └── rag_store.py   LanceDB vector store wrapper
+└── skills/
+    └── pdf-expert/
+        └── SKILL.md   Agent skill file
+
+webapp/
+├── src/
+│   ├── App.tsx        Router with 7 lazy-loaded pages
+│   ├── pages/         Dashboard, Workbench, Pipeline, Chat, Tools, Skills, Logs
+│   └── components/    AppLayout, Topbar, Sidebar, BackendDot, PdfViewer
+├── e2e/               Playwright tests
+├── vite.config.ts     Vite config with proxy (/api, /mcp -> :11131)
+└── package.json
+```
+
+## Configuration
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `MCP_MODE` | stdio | Server mode: stdio or http |
+| `MCP_HOST` | 127.0.0.1 | HTTP bind host |
+| `MCP_PORT` | 11131 | HTTP port |
+| `FRONTEND_PORT` | 11130 | Frontend CORS origin |
+| `RAG_EMBEDDING_URL` | (none) | OpenAI-compatible embedding endpoint |
+| `RAG_EMBEDDING_MODEL` | all-MiniLM-L6-v2 | Embedding model name |
+| `RAG_STORE_PATH` | data/lancedb | LanceDB storage path |
+| `UPLOAD_DIR` | data/uploads | Upload directory |
+| `PDF_MCP_TAURI` | (none) | Set to 1 when inside Tauri WebView |
+
+## Webapp Pages
+
+| Route | Page | Features |
+|-------|------|----------|
+| `/` | Dashboard | KPIs (health, tool count, uptime), recent PDFs, storage stats, exponential backoff health poll, data-testid attributes |
+| `/workbench` | Workbench | PDF.js viewer, tool palette sidebar (extract, annotate, convert), page navigation |
+| `/pipeline` | Pipeline | Upload PDF, select operation, configure params, run job, download result |
+| `/chat` | Chat | LLM chat with RAG context, personality selector, example prompts, export/clear |
+| `/tools` | Tools | Dynamic discovery via /api/tools, portmanteau drill-down, docstring rendering |
+| `/skills` | Skills | Load and render SKILL.md from /api/skills/{name} |
+| `/logs` | Logs | Real-time JSON-RPC log viewer |
+
+## REST Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Server health, version, uptime, tool count |
+| `/api/v1/diagnostics` | GET | Tools list, system info, errors |
+| `/api/pdf/upload` | POST | Upload PDF (multipart) |
+| `/api/pdf/{job_id}/status` | GET | Job status and progress |
+| `/api/pdf/{job_id}/result` | GET | Download job result file |
+| `/api/skills` | GET | List available skills |
+| `/api/skills/{name}` | GET | Raw SKILL.md content |
+| `/mcp` | SSE | MCP SSE transport (for webapp) |
+
+## Ports
+
+- Frontend: 11130 (Vite dev server)
+- Backend: 11131 (FastAPI + FastMCP HTTP)

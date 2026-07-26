@@ -1,0 +1,5 @@
+# pdf-mcp
+
+## Docs
+- README.md — full documentation
+- llms-full.txt — detailed tool reference

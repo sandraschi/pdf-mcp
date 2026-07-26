@@ -1,0 +1,163 @@
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Play, Upload, FileText } from "lucide-react";
+import { fetchJobs, submitJob } from "@/lib/api";
+
+const operations = [
+  { value: "extract_text", label: "Extract Text" },
+  { value: "extract_images", label: "Extract Images" },
+  { value: "extract_tables", label: "Extract Tables" },
+  { value: "compress", label: "Compress PDF" },
+  { value: "rotate", label: "Rotate Pages" },
+  { value: "encrypt", label: "Encrypt PDF" },
+  { value: "convert_markdown", label: "Convert to Markdown" },
+  { value: "merge", label: "Merge PDFs" },
+  { value: "split", label: "Split PDF" },
+];
+
+export default function Pipeline() {
+  const [file, setFile] = useState<File | null>(null);
+  const [operation, setOperation] = useState("extract_text");
+  const [jobs, setJobs] = useState<Array<{ job_id: string; operation: string; status: string; created: string }>>([]);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const loadJobs = async () => {
+    try {
+      const j = await fetchJobs();
+      setJobs(j);
+    } catch {
+      /* backend may not be ready */
+    }
+  };
+
+  useEffect(() => {
+    loadJobs();
+  }, []);
+
+  const handleExecute = async () => {
+    if (!file) return;
+    setRunning(true);
+    setResult(null);
+    try {
+      const r = await submitJob(operation, { filename: file.name });
+      setResult(`Job submitted: ${r.job_id}`);
+      await loadJobs();
+    } catch (e) {
+      setResult(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    }
+    setRunning(false);
+  };
+
+  const statusColor = (s: string) => {
+    switch (s) {
+      case "completed": return "text-green-400";
+      case "running": return "text-amber-400";
+      case "failed": return "text-red-400";
+      default: return "text-zinc-500";
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6" data-testid="pipeline">
+      <div>
+        <h2 className="text-2xl font-bold text-zinc-100">Pipeline</h2>
+        <p className="text-sm text-zinc-500 mt-1">Batch PDF operations</p>
+      </div>
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-2">PDF File</label>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 px-4 py-2.5 bg-zinc-800 rounded-lg cursor-pointer hover:bg-zinc-700 transition-colors text-zinc-300 text-sm">
+              <Upload size={16} />
+              {file ? file.name : "Choose file"}
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
+            </label>
+            {file && (
+              <button onClick={() => setFile(null)} className="text-xs text-zinc-500 hover:text-zinc-300">
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-2">Operation</label>
+          <select
+            value={operation}
+            onChange={(e) => setOperation(e.target.value)}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-amber-500"
+            data-testid="operation-select"
+          >
+            {operations.map((op) => (
+              <option key={op.value} value={op.value}>{op.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          onClick={handleExecute}
+          disabled={!file || running}
+          className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-black rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors disabled:opacity-50"
+          data-testid="execute-btn"
+        >
+          <Play size={16} />
+          {running ? "Running..." : "Execute"}
+        </button>
+
+        {result && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-sm text-zinc-400 bg-zinc-800/50 rounded-lg p-3"
+          >
+            {result}
+          </motion.div>
+        )}
+      </div>
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-zinc-800">
+          <h3 className="text-sm font-semibold text-zinc-100">Job History</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wider">
+                <th className="text-left px-5 py-3 font-medium">Job ID</th>
+                <th className="text-left px-5 py-3 font-medium">Operation</th>
+                <th className="text-left px-5 py-3 font-medium">Status</th>
+                <th className="text-left px-5 py-3 font-medium">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-5 py-8 text-center text-zinc-600">
+                    <FileText size={24} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No jobs yet</p>
+                  </td>
+                </tr>
+              ) : (
+                jobs.map((job) => (
+                  <tr key={job.job_id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                    <td className="px-5 py-3 text-zinc-300 font-mono text-xs">{job.job_id}</td>
+                    <td className="px-5 py-3 text-zinc-300">{job.operation}</td>
+                    <td className={`px-5 py-3 font-medium ${statusColor(job.status)}`}>{job.status}</td>
+                    <td className="px-5 py-3 text-zinc-500 text-xs">{job.created}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
