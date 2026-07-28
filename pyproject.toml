@@ -22,7 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 rag = ["sentence-transformers"]
 test = ["pytest", "pytest-asyncio", "httpx"]
-dev = ["ruff"]
+dev = ["ruff>=0.16.0,<0.17"]
 
 [build-system]
 requires = ["hatchling"]
@@ -34,6 +34,7 @@ line-length = 200
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
