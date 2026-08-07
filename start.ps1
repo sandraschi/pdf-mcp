@@ -42,7 +42,7 @@ if ($BackendOnly) {
 # Start frontend
 $WebRoot = Join-Path $ScriptRoot "webapp"
 Write-Host "Starting frontend..." -ForegroundColor Yellow
-$FrontendProcess = Start-Process -NoNewWindow -PassThru -FilePath "bun" -ArgumentList "run dev" -WorkingDirectory $WebRoot
+$FrontendProcess = Start-Process -NoNewWindow -PassThru -FilePath "C:\Users\sandr\.bun\bin\bun.exe" -ArgumentList "run dev" -WorkingDirectory $WebRoot
 
 Start-Sleep 3
 

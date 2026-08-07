@@ -1361,7 +1361,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-asyncio", marker = "extra == 'test'" },
     { name = "python-multipart" },
-    { name = "ruff", marker = "extra == 'dev'" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.0,<0.17" },
     { name = "sentence-transformers", marker = "extra == 'rag'" },
     { name = "uvicorn", extras = ["standard"] },
 ]

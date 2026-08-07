@@ -1,9 +1,11 @@
+set windows-shell := ["powershell.exe", "-NoProfile", "-Command"]
+
 # pdf-mcp justfile
 set positional-arguments := true
 
 default: serve
 
-# Start the server (dual transport — stdio or HTTP depending on env)
+# --- Start the server  dual transport  stdio or HTTP depending on env ---
 serve:
     uv run python run_server.py
 
@@ -47,3 +49,9 @@ clean:
     Remove-Item -Recurse -Force .venv/ -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force webapp/node_modules/ -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force webapp/dist/ -ErrorAction SilentlyContinue
+
+# Bootstrap: install dev deps + pre-commit hook
+bootstrap:
+    uv sync --group dev
+    uv run pre-commit install
+    Write-Host "Pre-commit hooks installed." -ForegroundColor Green
