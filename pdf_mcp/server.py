@@ -16,7 +16,7 @@ logger = logging.getLogger("pdf-mcp")
 
 mcp = FastMCP(
     cfg.server_name,
-    description=cfg.server_description,
+    instructions=cfg.server_description,
     version=cfg.version,
 )
 
@@ -67,7 +67,8 @@ def create_http_app() -> FastAPI:
 
     @app.get("/api/health")
     async def health():
-        tool_count = len(mcp._tool_manager._tools) if hasattr(mcp, "_tool_manager") else 42
+        tools = await mcp.list_tools()
+        tool_count = len(tools)
         return {
             "status": "ok",
             "server": cfg.server_name,
@@ -78,8 +79,9 @@ def create_http_app() -> FastAPI:
 
     @app.get("/api/v1/diagnostics")
     async def diagnostics():
-        tool_count = len(mcp._tool_manager._tools) if hasattr(mcp, "_tool_manager") else 42
-        tools_list = [{"name": t} for t in (mcp._tool_manager._tools.keys() if hasattr(mcp, "_tool_manager") else [])]
+        tools = await mcp.list_tools()
+        tool_count = len(tools)
+        tools_list = [{"name": t.name} for t in tools]
         return {
             "status": "ok",
             "server": cfg.server_name,
@@ -112,7 +114,7 @@ def main():
 
     if args.mode == "http":
         http_app = create_http_app()
-        http_app.mount("/mcp", mcp.sse_app())
+        http_app.mount("/mcp", mcp.http_app())
 
         logging.basicConfig(level=logging.INFO)
         logger.info("Starting HTTP server on %s:%s", args.host, args.port)
