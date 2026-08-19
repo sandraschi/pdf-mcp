@@ -83,19 +83,21 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Key vars: `MCP_MODE` (stdio/
 
 | Route | Page |
 |-------|------|
-| `/` | Dashboard (KPIs, LLM availability) |
-| `/workbench` | PDF.js viewer + tool palette |
-| `/pipeline` | Batch operations |
-| `/chat` | LLM chat with RAG context |
+| `/` | Dashboard (KPIs, LLM availability, usage stats) |
+| `/workbench` | PDF.js viewer + OCR badge + compare mode + tool palette |
+| `/pipeline` | Single operations + multi-step recipes + share links |
+| `/chat` | LLM chat with PDF search + source citations |
 | `/tools` / `/skills` / `/logs` | Discovery & logs |
 
 ## Documentation
 
+- [Feature spec](SPEC.md)
 - [Install & setup](docs/INSTALL.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Tools & endpoints](docs/TOOLS.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Onboarding](docs/ONBOARDING.md)
 - [Full LLM reference](llms-full.txt)
 - [Changelog](CHANGELOG.md)
 

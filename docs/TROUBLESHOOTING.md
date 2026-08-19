@@ -48,3 +48,29 @@ Run pyright through the venv: `uv run --extra dev pyright pdf_mcp/`. A bare
 
 - Check the live log tail: `http://127.0.0.1:11131/api/logs`
 - File an issue at https://github.com/sandraschi/pdf-mcp/issues
+
+## New in 0.2 (Intelligence 2.0)
+
+### LLM-dependent features say "no local LLM"
+`pdf_do`, `pdf_forms auto_fill`, `pdf_annotate summary_box`, `pdf_rag synthesize`
+summaries, and `pdf_export` summaries require a local LLM. Start Ollama
+(`ollama serve`) or LM Studio. All non-LLM features (extract, manipulate, validate,
+analyze, redact, classify, dedupe, search) work without one.
+
+### `pdf_rag index` fails with "field does not exist in table schema"
+A stale LanceDB table from before the `source_file` column was added. The server
+auto-migrates on the next index attempt (drops and rebuilds the table). To force a
+clean reset: stop the server, delete `data/lancedb/`, restart, and re-index.
+
+### Watch-folder does nothing
+`data/watch/` is created on HTTP startup. Make sure the server runs in HTTP mode
+(`uv run python run_server.py --mode http`) and drop a `.pdf` there. Check
+`/api/watch/status` for processed/errors.
+
+### Share link returns 410
+Share tokens expire after 24 h (in-memory registry). Re-create the link via
+`POST /api/share/{job_id}`. Restarting the server invalidates all tokens.
+
+### RAG search returns no results
+You must index first (`pdf_rag index` or the `ingest` recipe). `search`, `similar`,
+and `synthesize` only search what has been indexed. Check `pdf_rag list_documents`.

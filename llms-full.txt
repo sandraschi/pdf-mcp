@@ -188,16 +188,28 @@ LLM summarizes the document and stamps the summary onto page 1.
 ```
 pdf_mcp/
 ├── server.py          FastMCP app + Starlette HTTP app + REST endpoints
+│                      (recipes, watch-folder, share links, usage stats)
 ├── config.py          Env-based configuration
 ├── models.py          Pydantic models + operation literals
-├── tools/             8 tool modules (extract, manipulate, annotate, forms,
-│                      convert, validate, rag, meta)
+├── tools/             10 tool modules
+│   ├── extract.py     pdf_extract
+│   ├── manipulate.py  pdf_manipulate
+│   ├── annotate.py    pdf_annotate (incl. summary_box)
+│   ├── forms.py       pdf_forms (incl. auto_fill)
+│   ├── convert.py     pdf_convert
+│   ├── validate.py    pdf_validate
+│   ├── rag.py         pdf_rag (search / similar / synthesize)
+│   ├── intel.py       pdf_analyze, pdf_redact, pdf_classify, pdf_dedupe, pdf_export
+│   ├── agent.py       pdf_do (agentic chaining)
+│   └── meta.py        pdf_help, pdf_status, pdf_shutdown
 ├── services/          Core engines
 │   ├── extractor.py   PyMuPDF text/image/table/metadata extraction
 │   ├── manipulator.py pypdf merge/split/rotate/compress/encrypt
 │   ├── converter.py   PDF to/from Markdown/HTML/images
-│   ├── chunker.py     Text chunking strategies
-│   └── rag_store.py   LanceDB vector store wrapper
+│   ├── chunker.py     Text chunking (recursive, fixed, table-aware)
+│   ├── rag_store.py   LanceDB vector store wrapper
+│   ├── intel.py       Analyzer, Redactor, Classifier, Deduper, BriefBuilder
+│   └── llm.py         Local LLM discovery + chat completions
 └── skills/
     └── pdf-expert/
         └── SKILL.md   Agent skill file
@@ -230,10 +242,10 @@ webapp/
 
 | Route | Page | Features |
 |-------|------|----------|
-| `/` | Dashboard | KPIs (health, tool count, uptime), LLM availability banner, exponential backoff health poll |
-| `/workbench` | Workbench | PDF.js canvas viewer, tool palette, live job execution with result download |
-| `/pipeline` | Pipeline | Upload PDF, select operation, run job, job history |
-| `/chat` | Chat | LLM chat with skill-first system prompt, personality + provider/model select, export/clear |
+| `/` | Dashboard | KPIs (health, tool count, uptime), LLM availability banner, usage stats panel, exponential backoff health poll |
+| `/workbench` | Workbench | PDF.js canvas viewer, OCR (scanned/digital) badge, side-by-side compare mode, tool palette, live job execution with result download |
+| `/pipeline` | Pipeline | Upload PDF, single operation or multi-step recipe, job history with share links |
+| `/chat` | Chat | LLM chat with skill-first system prompt, personality + provider/model select, PDF search with source citations (jump-to-page), export/clear |
 | `/tools` | Tools | Dynamic discovery via /api/tools, portmanteau drill-down, input schema rendering |
 | `/skills` | Skills | Load and render SKILL.md from /api/skills/{name} (XSS-safe) |
 | `/logs` | Logs | Real-time log viewer (ring buffer) |

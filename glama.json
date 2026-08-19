@@ -1,6 +1,6 @@
 {
   "name": "pdf-mcp",
-  "description": "Full-stack PDF intelligence MCP server — extract, manipulate, annotate, convert, validate, and RAG-search PDFs",
+  "description": "Full-stack PDF intelligence MCP server — extract, manipulate, annotate, convert, validate, redact, classify, and RAG-search PDFs with an agentic pdf_do tool",
   "repository": "https://github.com/sandraschi/pdf-mcp",
   "server_type": "python",
   "runtime": "uv",
@@ -11,7 +11,16 @@
     "pdf_forms",
     "pdf_convert",
     "pdf_validate",
-    "pdf_rag"
+    "pdf_rag",
+    "pdf_analyze",
+    "pdf_redact",
+    "pdf_classify",
+    "pdf_dedupe",
+    "pdf_export",
+    "pdf_do",
+    "pdf_help",
+    "pdf_status",
+    "pdf_shutdown"
   ],
-  "categories": ["document-processing", "file-management", "rag"]
+  "categories": ["document-processing", "file-management", "rag", "security"]
 }
