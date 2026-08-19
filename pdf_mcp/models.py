@@ -40,6 +40,7 @@ PdfAnnotateOperation = Literal[
     "underline",
     "header_footer",
     "page_numbers",
+    "summary_box",
 ]
 
 
@@ -50,6 +51,7 @@ PdfFormsOperation = Literal[
     "fill",
     "flatten",
     "export_data",
+    "auto_fill",
 ]
 
 
@@ -82,6 +84,8 @@ PdfRagOperation = Literal[
     "chunk",
     "index",
     "search",
+    "similar",
+    "synthesize",
     "list_documents",
     "delete_index",
 ]

@@ -1,7 +1,9 @@
 import BackendDot from "@/components/BackendDot";
+import { fetchStats } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { motion } from "framer-motion";
-import { Activity, Clock, Cpu, FileText, Hash, MessageSquare, Server, Workflow } from "lucide-react";
+import { Activity, BarChart3, Clock, Cpu, FileText, Hash, MessageSquare, Server, Workflow } from "lucide-react";
+import { useEffect, useState } from "react";
 
 function formatUptime(s: number): string {
   const h = Math.floor(s / 3600);
@@ -38,6 +40,18 @@ export default function Dashboard() {
   const backendOk = useStore((s) => s.backendOk);
   const llmAvailable = useStore((s) => s.llmAvailable);
   const llmProbing = useStore((s) => s.llmProbing);
+  const [stats, setStats] = useState<{
+    operations: Array<{ operation: string; count: number; avg_ms: number }>;
+    total_jobs: number;
+    total_files: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (backendOk !== true) return;
+    fetchStats()
+      .then(setStats)
+      .catch(() => {});
+  }, [backendOk]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-8" data-testid="dashboard">
@@ -79,6 +93,40 @@ export default function Dashboard() {
               Open Chat to set up a model
             </a>
           </div>
+        </div>
+      )}
+
+      {stats && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6" data-testid="stats-panel">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 size={16} className="text-amber-500" />
+            <h3 className="text-lg font-semibold text-zinc-100">Usage</h3>
+            <span className="text-xs text-zinc-500 ml-auto">
+              {stats.total_jobs} jobs · {stats.total_files} files
+            </span>
+          </div>
+          {stats.operations.length === 0 ? (
+            <p className="text-sm text-zinc-500">No operations run yet in this session.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wider">
+                  <th className="text-left py-2 font-medium">Operation</th>
+                  <th className="text-right py-2 font-medium">Count</th>
+                  <th className="text-right py-2 font-medium">Avg (ms)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.operations.slice(0, 8).map((op) => (
+                  <tr key={op.operation} className="border-b border-zinc-800/40">
+                    <td className="py-2 text-zinc-300">{op.operation}</td>
+                    <td className="py-2 text-right text-zinc-300">{op.count}</td>
+                    <td className="py-2 text-right text-zinc-500">{Math.round(op.avg_ms)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 

@@ -96,15 +96,84 @@ Audit PDF quality and compliance.
 
 ### pdf_rag
 
-Build and query a RAG index over PDF content.
+Build and query a RAG index over PDF content. Tables are indexed as structured
+chunks (`section: "table"`); results carry `source_file` and `page_num` for
+citation jumps.
 
 | Operation | Parameters | Returns |
 |-----------|-----------|---------|
 | `chunk` | path, strategy (recursive/fixed), chunk_size (1000), overlap (200) | `{chunks, doc_id}` |
 | `index` | path, strategy, chunk_size, overlap | `{chunks_indexed, doc_id}` |
-| `search` | query, limit (10) | `{results: [{doc_id, chunk_id, page_num, text, _distance}]}` |
+| `search` | query, limit (10) | `{results: [{doc_id, chunk_id, page_num, section, source_file, text, _distance}]}` |
+| `similar` | text (query-by-example snippet), limit | `{results: [...]}` same shape as search |
+| `synthesize` | query, limit | `{groups: [{doc_id, source_file, hits, snippets}], summary?, llm}` |
 | `list_documents` | (none) | `{documents: [{doc_id, chunk_count}]}` |
 | `delete_index` | doc_id | `{success}` |
+
+### pdf_analyze
+
+Detect scanned vs digital PDFs with layout stats.
+
+| Parameter | Returns |
+|-----------|---------|
+| path | `{has_text_layer, scanned, pages, chars_per_page, total_chars, image_count, layout_hint, per_page}` |
+
+### pdf_redact
+
+Blacken sensitive content by terms and/or PII patterns (email, phone, IBAN, card, SSN, IP).
+
+| Parameter | Returns |
+|-----------|---------|
+| path, terms?, pii?, output_path? | `{path, occurrences}` |
+
+### pdf_classify
+
+Guess the document type (invoice, receipt, report, contract, form, resume,
+presentation, letter, scanned-document, other) with candidate field extraction.
+
+| Parameter | Returns |
+|-----------|---------|
+| path, refine? | `{doc_type, confidence, fields, reasons, llm_refined}` |
+
+### pdf_dedupe
+
+Detect exact and near-duplicate PDFs by content fingerprint.
+
+| Parameter | Returns |
+|-----------|---------|
+| paths, threshold (0.85) | `{files, exact_duplicates, near_duplicates}` |
+
+### pdf_export
+
+Build a reusable document brief (markdown or JSON) with headings, key terms, optional LLM summary.
+
+| Parameter | Returns |
+|-----------|---------|
+| path, format (markdown/json), include_summary | `{path, pages, summary}` |
+
+### pdf_do
+
+Chain the PDF tools autonomously from a natural-language task (requires a local LLM).
+
+| Parameter | Returns |
+|-----------|---------|
+| task, path | `{answer, steps: [{tool, args, result}]}` |
+
+### pdf_forms — auto_fill
+
+LLM-guided form filling: extract field labels, map values from a source PDF/text, fill and save.
+
+| Parameter | Returns |
+|-----------|---------|
+| path, source (PDF) or text | `{path, filled, missing}` |
+
+### pdf_annotate — summary_box
+
+LLM summarizes the document and stamps the summary onto page 1.
+
+| Parameter | Returns |
+|-----------|---------|
+| path | `{path, summary}` |
 
 ### Meta tools
 
@@ -186,7 +255,18 @@ webapp/
 | `/api/jobs/{job_id}` | GET | Job status and progress |
 | `/api/pdf/{job_id}/result` | GET | Download job result file |
 | `/api/logs` | GET | Ring-buffer log tail |
+| `/api/recipes` | GET | Named pipeline recipes (ingest, redact_export, brief) |
+| `/api/pdf/analyze` | GET | OCR readiness for an uploaded file |
+| `/api/pdf/compare` | POST | Side-by-side text diff of two uploaded files |
+| `/api/pdf/dedupe` | POST | Exact/near-duplicate check across uploaded files |
+| `/api/rag/search` | POST | Synchronous RAG search (chat sources) |
+| `/api/share/{job_id}` | POST | Create a 24 h share link for a completed job |
+| `/api/share/{token}` | GET | Stream a shared result file |
+| `/api/stats` | GET | Per-operation usage stats |
+| `/api/watch/status` | GET | Watch-folder status |
 | `/mcp` | POST | MCP streamable HTTP transport |
+
+`POST /api/jobs` also accepts `{recipe: "ingest"|"redact_export"|"brief", params}` to run multi-step recipes.
 
 ## Ports
 

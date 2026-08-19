@@ -1,5 +1,6 @@
-import { API_BASE, submitJob, uploadPdf } from "@/lib/api";
+import { API_BASE, analyzeFile, compareFiles, submitJob, uploadPdf } from "@/lib/api";
 import {
+  Columns2,
   Download,
   FileCode,
   FileText,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 
@@ -80,6 +82,7 @@ const OPERATION_MAP: Record<string, string> = {
 };
 
 export default function Workbench() {
+  const [searchParams] = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ job_id: string; pages: number; size: number } | null>(null);
@@ -88,36 +91,79 @@ export default function Workbench() {
   const [resultJobId, setResultJobId] = useState<string | null>(null);
   const [runningTool, setRunningTool] = useState<string | null>(null);
   const [pageNum, setPageNum] = useState(1);
+  const [analysis, setAnalysis] = useState<{
+    has_text_layer: boolean;
+    scanned: boolean;
+    layout_hint: string;
+    chars_per_page: number;
+  } | null>(null);
+  const [compare, setCompare] = useState(false);
+  const [compareFile, setCompareFile] = useState<File | null>(null);
+  const [compareResult, setCompareResult] = useState<string | null>(null);
+  const [jumpHint, setJumpHint] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasBRef = useRef<HTMLCanvasElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
   const fileUrl = uploadResult && file ? `${API_BASE}/api/pdf/files/${encodeURIComponent(file.name)}` : null;
+  const fileUrlB = compare && compareFile ? `${API_BASE}/api/pdf/files/${encodeURIComponent(compareFile.name)}` : null;
+
+  // Load ?file=&page= deep link (citation jump from Chat)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only deep-link load
+  useEffect(() => {
+    const linkedFile = searchParams.get("file");
+    const linkedPage = Number(searchParams.get("page") || "1");
+    if (linkedFile) {
+      setFile(new File([], linkedFile, { type: "application/pdf" }));
+      setUploadResult({ job_id: "", pages: 0, size: 0 });
+      setPageNum(linkedPage > 0 ? linkedPage : 1);
+      setJumpHint(true);
+    }
+  }, []);
+
+  const renderPdfPage = useCallback(async (url: string, canvas: HTMLCanvasElement | null, page: number) => {
+    if (!url || !canvas) return;
+    try {
+      const doc = await pdfjsLib.getDocument(url).promise;
+      const pg = await doc.getPage(Math.min(page, doc.numPages));
+      const viewport = pg.getViewport({ scale: 1.5 });
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await pg.render({ canvasContext: ctx, viewport }).promise;
+    } catch {
+      /* render fallback to metadata */
+    }
+  }, []);
 
   useEffect(() => {
-    if (!fileUrl || !canvasRef.current) return;
+    if (fileUrl) renderPdfPage(fileUrl, canvasRef.current, pageNum);
+  }, [fileUrl, pageNum, renderPdfPage]);
+
+  useEffect(() => {
+    if (fileUrlB) renderPdfPage(fileUrlB, canvasBRef.current, pageNum);
+  }, [fileUrlB, pageNum, renderPdfPage]);
+
+  // OCR analysis badge
+  useEffect(() => {
+    if (!uploadResult || !file || uploadResult.pages === 0) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const doc = await pdfjsLib.getDocument(fileUrl).promise;
-        if (cancelled) return;
-        const page = await doc.getPage(Math.min(pageNum, doc.numPages));
-        if (cancelled) return;
-        const viewport = page.getViewport({ scale: 1.5 });
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-      } catch {
-        /* PDF may not be renderable in-browser; fall back to metadata */
-      }
-    })();
+    analyzeFile(file.name)
+      .then((a) => {
+        if (!cancelled && a.success)
+          setAnalysis({
+            has_text_layer: a.has_text_layer,
+            scanned: a.scanned,
+            layout_hint: a.layout_hint,
+            chars_per_page: a.chars_per_page,
+          });
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [fileUrl, pageNum]);
+  }, [uploadResult, file]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -132,6 +178,7 @@ export default function Workbench() {
       const r = await uploadPdf(file);
       setUploadResult(r);
       setPageNum(1);
+      setJumpHint(false);
     } catch (e) {
       setToolResult(`Upload failed: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
@@ -171,6 +218,29 @@ export default function Workbench() {
     setRunningTool(null);
   };
 
+  const runCompare = async () => {
+    if (!compareFile || !file) return;
+    setCompareResult(null);
+    try {
+      if (compareFile.name !== file.name) {
+        await uploadPdf(compareFile);
+      }
+      const result = await compareFiles(file.name, compareFile.name);
+      if (!result.success) {
+        setCompareResult(result.error || "compare failed");
+        return;
+      }
+      const lines = [
+        `Page count: ${result.same_page_count ? "same" : "DIFFERS"}`,
+        `Text similarity: ${(result.text_similarity * 100).toFixed(1)}%`,
+        ...(result.diffs || []).slice(0, 15).map((d) => d.slice(0, 160)),
+      ];
+      setCompareResult(lines.join("\n"));
+    } catch (e) {
+      setCompareResult(`Compare failed: ${e instanceof Error ? e.message : "unknown"}`);
+    }
+  };
+
   useEffect(() => {
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault();
@@ -184,8 +254,13 @@ export default function Workbench() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-2xl font-bold text-zinc-100">Workbench</h2>
-          <p className="text-sm text-zinc-500 mt-1">View and process PDF documents</p>
+          <p className="text-sm text-zinc-500 mt-1">View, compare, and process PDF documents</p>
         </div>
+        {jumpHint && (
+          <span className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
+            Linked from chat - upload to view page
+          </span>
+        )}
       </div>
 
       <div
@@ -215,10 +290,22 @@ export default function Workbench() {
                   setUploadResult(null);
                   setToolResult(null);
                   setResultJobId(null);
+                  setCompare(false);
+                  setCompareFile(null);
                 }}
                 className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors"
               >
                 Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompare((c) => !c)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm transition-colors ${
+                  compare ? "bg-amber-500 text-black" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                }`}
+                data-testid="compare-toggle"
+              >
+                <Columns2 size={14} /> Compare
               </button>
             </div>
           </div>
@@ -244,37 +331,102 @@ export default function Workbench() {
 
       {uploadResult && (
         <div className="flex-1 flex gap-4 min-h-0">
-          <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-4 overflow-auto" data-testid="pdf-viewer">
-            {fileUrl ? (
-              <div className="flex flex-col items-center gap-3 min-h-full justify-center">
-                <canvas ref={canvasRef} className="max-w-full h-auto shadow-lg rounded" />
-                <div className="flex items-center gap-3 text-sm text-zinc-400">
-                  <button
-                    type="button"
-                    disabled={pageNum <= 1}
-                    onClick={() => setPageNum((p) => p - 1)}
-                    className="px-3 py-1 bg-zinc-800 rounded-lg disabled:opacity-30 hover:bg-zinc-700"
+          <div className="flex-1 grid grid-cols-1 gap-4 min-w-0" style={compare ? { gridTemplateColumns: "1fr 1fr" } : undefined}>
+            <div className="flex flex-col min-h-0 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden" data-testid="pdf-viewer">
+              <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between">
+                <p className="text-xs text-zinc-400 truncate">{file?.name}</p>
+                {analysis && (
+                  <span
+                    className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                      analysis.scanned ? "bg-amber-500/15 text-amber-400" : "bg-green-500/15 text-green-400"
+                    }`}
+                    data-testid="ocr-badge"
                   >
-                    Prev
-                  </button>
-                  <span>
-                    Page {pageNum} / {uploadResult.pages}
+                    {analysis.scanned ? "Scanned" : "Digital"} · {analysis.chars_per_page} ch/pg
                   </span>
-                  <button
-                    type="button"
-                    disabled={pageNum >= uploadResult.pages}
-                    onClick={() => setPageNum((p) => p + 1)}
-                    className="px-3 py-1 bg-zinc-800 rounded-lg disabled:opacity-30 hover:bg-zinc-700"
-                  >
-                    Next
-                  </button>
-                </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center space-y-2">
-                <FileText size={48} className="mx-auto text-zinc-700" />
-                <p className="text-sm">{file?.name}</p>
-                <p className="text-xs">{uploadResult.pages} pages</p>
+              <div className="flex-1 p-4 overflow-auto flex flex-col items-center justify-center gap-3">
+                {fileUrl ? (
+                  <>
+                    <canvas ref={canvasRef} className="max-w-full h-auto shadow-lg rounded" />
+                    <div className="flex items-center gap-3 text-sm text-zinc-400">
+                      <button
+                        type="button"
+                        disabled={pageNum <= 1}
+                        onClick={() => setPageNum((p) => p - 1)}
+                        className="px-3 py-1 bg-zinc-800 rounded-lg disabled:opacity-30 hover:bg-zinc-700"
+                      >
+                        Prev
+                      </button>
+                      <span>
+                        Page {pageNum} / {uploadResult.pages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={pageNum >= uploadResult.pages}
+                        onClick={() => setPageNum((p) => p + 1)}
+                        className="px-3 py-1 bg-zinc-800 rounded-lg disabled:opacity-30 hover:bg-zinc-700"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center space-y-2">
+                    <FileText size={48} className="mx-auto text-zinc-700" />
+                    <p className="text-sm">{jumpHint ? "Upload this file to view it." : file?.name}</p>
+                    {jumpHint && (
+                      <button type="button" onClick={handleUpload} className="px-3 py-1.5 bg-amber-500 text-black rounded-lg text-sm">
+                        Upload now
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {compare && (
+              <div
+                className="flex flex-col min-h-0 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden"
+                data-testid="compare-viewer"
+              >
+                <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-2">
+                  {compareFile ? (
+                    <p className="text-xs text-zinc-400 truncate">{compareFile.name}</p>
+                  ) : (
+                    <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-400">
+                      <Upload size={12} /> Choose second PDF
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) setCompareFile(f);
+                        }}
+                      />
+                    </label>
+                  )}
+                  {compareFile && (
+                    <button
+                      type="button"
+                      onClick={runCompare}
+                      className="text-[11px] px-2 py-1 bg-amber-500 text-black rounded font-medium hover:bg-amber-400"
+                      data-testid="run-compare"
+                    >
+                      Compare
+                    </button>
+                  )}
+                </div>
+                <div className="flex-1 p-4 overflow-auto flex flex-col items-center gap-2">
+                  <canvas ref={canvasBRef} className="max-w-full h-auto shadow-lg rounded" />
+                  {compareResult && (
+                    <pre className="w-full text-[11px] text-zinc-400 whitespace-pre-wrap bg-zinc-800/60 rounded p-2 max-h-40 overflow-auto">
+                      {compareResult}
+                    </pre>
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -92,3 +92,82 @@ export async function fetchLlmDiscover(): Promise<{
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
+
+export interface RagHit {
+  doc_id: string;
+  chunk_id: string;
+  page_num: number;
+  text: string;
+  section?: string | null;
+  source_file?: string | null;
+  _distance?: number | null;
+}
+
+export async function ragSearch(query: string, limit = 10): Promise<RagHit[]> {
+  const r = await fetch(`${API_BASE}/api/rag/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, limit }),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  if (!data.success) throw new Error(data.error || "search failed");
+  return data.results || [];
+}
+
+export async function analyzeFile(filename: string): Promise<{
+  success: boolean;
+  has_text_layer: boolean;
+  scanned: boolean;
+  pages: number;
+  chars_per_page: number;
+  layout_hint: string;
+  error?: string;
+}> {
+  const r = await fetch(`${API_BASE}/api/pdf/analyze?filename=${encodeURIComponent(filename)}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function compareFiles(
+  pathA: string,
+  pathB: string,
+): Promise<{
+  success: boolean;
+  same_page_count: boolean;
+  text_similarity: number;
+  diffs: string[];
+  error?: string;
+}> {
+  const r = await fetch(`${API_BASE}/api/pdf/compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path_a: pathA, path_b: pathB }),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function createShare(jobId: string): Promise<string> {
+  const r = await fetch(`${API_BASE}/api/share/${jobId}`, { method: "POST" });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  return `${API_BASE}${data.url}`;
+}
+
+export async function fetchStats(): Promise<{
+  operations: Array<{ operation: string; count: number; avg_ms: number; last_at: string | null }>;
+  total_jobs: number;
+  total_files: number;
+}> {
+  const r = await fetch(`${API_BASE}/api/stats`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function fetchRecipes(): Promise<Array<{ name: string; steps: string[] }>> {
+  const r = await fetch(`${API_BASE}/api/recipes`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  return data.recipes || [];
+}

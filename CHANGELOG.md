@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.0 (2026-08-19)
+
+- **Intelligence 2.0 feature set** (see `SPEC.md`): 22 features across RAG, extraction,
+  automation, agentic tooling, and webapp.
+  - New tools: `pdf_analyze` (scanned/digital), `pdf_redact` (terms + PII),
+    `pdf_classify` (doc-type classifier), `pdf_dedupe` (fingerprint/near-dup),
+    `pdf_export` (document brief), `pdf_do` (agentic chaining).
+  - New operations: `pdf_rag` `similar` (query-by-example) + `synthesize`
+    (cross-document, LLM summary), table-aware chunking, `source_file` in search hits;
+    `pdf_forms` `auto_fill` (LLM-guided); `pdf_annotate` `summary_box`.
+  - New REST: `/api/rag/search`, `/api/pdf/analyze`, `/api/pdf/compare`, `/api/pdf/dedupe`,
+    `/api/recipes`, `/api/share/{job_id}`, `/api/share/{token}`, `/api/stats`,
+    `/api/watch/status`.
+  - Pipeline recipes (`ingest`, `redact_export`, `brief`) + watch-folder auto-process
+    (`data/watch/`).
+  - Webapp: Chat PDF search + source citations with jump-to-page, Workbench OCR badge +
+    side-by-side compare mode + deep-link viewer, Pipeline recipes + share links,
+    Dashboard usage stats panel.
+  - 15 tests (was 8); all gates green (ruff, pyright, pytest, tsc, biome).
+
 ## 0.1.0 (2026-08-19)
 
 - **assfix 2026-08-19**: repaired a runt server.

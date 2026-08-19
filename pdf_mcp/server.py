@@ -1,11 +1,13 @@
 import asyncio
 import logging
+import secrets
 import sys
+import threading
 import time
 from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from uuid import uuid4
 
 import uvicorn
@@ -15,6 +17,9 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
 from pdf_mcp.config import cfg
+from pdf_mcp.services.llm import chat_completion as _llm_chat_completion
+from pdf_mcp.services.llm import default_provider as _llm_default_provider
+from pdf_mcp.services.llm import discover_providers as _llm_discover_providers
 
 logger = logging.getLogger("pdf-mcp")
 
@@ -88,7 +93,10 @@ class JobStore:
     def list_uploads(self) -> dict[str, str]:
         return dict(self._uploads)
 
-    def create_job(self, operation: str, params: dict) -> str:
+    def register_upload(self, filename: str, path: str) -> None:
+        self._uploads[Path(filename).name] = str(path)
+
+    def create_job(self, operation: str, params: dict, steps: list[dict] | None = None) -> str:
         job_id = uuid4().hex[:12]
         self._jobs[job_id] = {
             "job_id": job_id,
@@ -98,6 +106,9 @@ class JobStore:
             "created": datetime.now(UTC).isoformat(),
             "result_path": None,
             "error": None,
+            "steps": steps,
+            "step_index": 0,
+            "step_log": [],
         }
         return job_id
 
@@ -111,12 +122,25 @@ class JobStore:
                 "operation": j["operation"],
                 "status": j["status"],
                 "created": j["created"],
+                "steps": len(j["steps"]) if j.get("steps") else None,
             }
             for j in self._jobs.values()
         ]
 
     def mark_running(self, job_id: str) -> None:
         self._jobs[job_id]["status"] = "running"
+
+    def set_step(self, job_id: str, index: int) -> None:
+        job = self._jobs[job_id]
+        job["step_index"] = index
+        if job.get("steps"):
+            job["step_log"].append({"step": index, "operation": job["steps"][index]["operation"], "status": "running"})
+
+    def append_step_result(self, job_id: str, result: dict) -> None:
+        log = self._jobs[job_id]["step_log"]
+        if log:
+            log[-1]["status"] = "done" if result.get("success") else "failed"
+            log[-1]["detail"] = result.get("message") or result.get("error")
 
     def mark_done(self, job_id: str, result_path: str | None, error: str | None = None) -> None:
         job = self._jobs[job_id]
@@ -130,9 +154,6 @@ jobs = JobStore()
 
 # ── LLM discovery + chat ──
 
-_OLLAMA = "http://127.0.0.1:11434"
-_LM_STUDIO = "http://127.0.0.1:1234"
-
 _PERSONALITY_PROMPTS: dict[str, str] = {
     "research-assistant": "You are a precise research assistant. Answer concisely and cite sources when possible.",
     "expert-reviewer": "You are a critical expert reviewer. Evaluate claims rigorously and flag weaknesses.",
@@ -141,62 +162,134 @@ _PERSONALITY_PROMPTS: dict[str, str] = {
 }
 
 
-async def _probe(url: str, path: str, timeout: float = 1.5) -> list[dict] | None:
-    import httpx
-
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            r = await client.get(f"{url}{path}")
-            if r.status_code != 200:
-                return None
-            data = r.json()
-            if "data" in data:
-                return data["data"]
-            if "models" in data:
-                return data["models"]
-            return None
-    except Exception:
-        return None
-
-
 async def _discover_providers() -> dict[str, dict]:
-    providers: dict[str, dict] = {}
-    ollama_models = await _probe(_OLLAMA, "/api/tags")
-    if ollama_models is not None:
-        providers["ollama"] = {
-            "name": "Ollama",
-            "base_url": _OLLAMA,
-            "available": True,
-            "models": [m.get("name", m.get("model", "")) for m in ollama_models if isinstance(m, dict)],
-        }
-    else:
-        providers["ollama"] = {"name": "Ollama", "base_url": _OLLAMA, "available": False, "models": []}
-    lm_models = await _probe(_LM_STUDIO, "/v1/models")
-    if lm_models is not None:
-        providers["lmstudio"] = {
-            "name": "LM Studio",
-            "base_url": _LM_STUDIO,
-            "available": True,
-            "models": [m.get("id", "") for m in lm_models if isinstance(m, dict)],
-        }
-    else:
-        providers["lmstudio"] = {"name": "LM Studio", "base_url": _LM_STUDIO, "available": False, "models": []}
-    return providers
+    return await _llm_discover_providers()
 
 
-async def _chat_completion(messages: list[dict], provider: str, model: str) -> str:
-    import httpx
+async def _chat_completion(messages: list[dict], provider: str | None, model: str | None) -> str:
+    provider, model, _ = await _llm_default_provider()
+    if not provider or not model:
+        raise RuntimeError("No local LLM detected.")
+    return await _llm_chat_completion(messages, provider, model)
 
-    base = _OLLAMA if provider == "ollama" else _LM_STUDIO
-    url = f"{base}/v1/chat/completions"
-    async with httpx.AsyncClient(timeout=60) as client:
-        r = await client.post(
-            url,
-            json={"model": model, "messages": messages, "stream": False},
-        )
-        r.raise_for_status()
-        data = r.json()
-        return data["choices"][0]["message"]["content"]
+
+# ── Usage stats registry ──
+
+
+class StatsRegistry:
+    def __init__(self) -> None:
+        self._ops: dict[str, dict] = {}
+        self._total_jobs = 0
+        self._total_files = 0
+
+    def record(self, operation: str, elapsed_ms: float) -> None:
+        op = self._ops.setdefault(operation, {"count": 0, "total_ms": 0.0, "last_at": None})
+        op["count"] += 1
+        op["total_ms"] += elapsed_ms
+        op["last_at"] = datetime.now(UTC).isoformat()
+        self._total_jobs += 1
+
+    def add_file(self) -> None:
+        self._total_files += 1
+
+    def snapshot(self) -> dict:
+        ops = []
+        for name, op in sorted(self._ops.items(), key=lambda kv: -kv[1]["count"]):
+            ops.append(
+                {
+                    "operation": name,
+                    "count": op["count"],
+                    "avg_ms": round(op["total_ms"] / op["count"], 1) if op["count"] else 0,
+                    "last_at": op["last_at"],
+                }
+            )
+        return {"operations": ops, "total_jobs": self._total_jobs, "total_files": self._total_files}
+
+
+stats = StatsRegistry()
+
+
+# ── Share registry (tokenized result links) ──
+
+_share_expiry_s = 86400  # 24 h
+
+
+class ShareRegistry:
+    def __init__(self) -> None:
+        self._links: dict[str, dict] = {}
+
+    def create(self, job_id: str) -> str:
+        token = secrets.token_urlsafe(16)
+        self._links[token] = {"job_id": job_id, "expires": time.time() + _share_expiry_s}
+        return token
+
+    def resolve(self, token: str) -> str | None:
+        link = self._links.get(token)
+        if not link:
+            return None
+        if time.time() > link["expires"]:
+            self._links.pop(token, None)
+            return None
+        return link["job_id"]
+
+
+shares = ShareRegistry()
+
+
+# ── Pipeline recipes ──
+
+
+RECIPES: dict[str, list[dict]] = {
+    "ingest": [
+        {"operation": "analyze", "params": {}},
+        {"operation": "index", "params": {}},
+        {"operation": "export_brief", "params": {"include_summary": True}},
+    ],
+    "redact_export": [
+        {"operation": "analyze", "params": {}},
+        {"operation": "redact", "params": {"pii": True}},
+        {"operation": "export_brief", "params": {"include_summary": False}},
+    ],
+    "brief": [
+        {"operation": "export_brief", "params": {"include_summary": True}},
+    ],
+}
+
+
+def _recipe_steps(recipe: str) -> list[dict] | None:
+    return RECIPES.get(recipe)
+
+
+# ── Watch-folder auto-process ──
+
+watch_state: dict[str, Any] = {"watching": False, "processed": [], "errors": []}
+
+
+async def _watch_loop() -> None:
+    watch_dir = cfg.repo_root / "data" / "watch"
+    watch_dir.mkdir(parents=True, exist_ok=True)
+    watch_state["watching"] = True
+    seen: set[str] = set()
+    while True:
+        try:
+            for p in sorted(watch_dir.glob("*.pdf")):
+                if p.name in seen:
+                    continue
+                seen.add(p.name)
+                try:
+                    jobs.register_upload(p.name, str(p))
+                    job_id = jobs.create_job("ingest", {"filename": p.name}, steps=_recipe_steps("ingest"))
+                    asyncio.create_task(_execute_recipe(job_id, "ingest", _recipe_steps("ingest") or [], {"filename": p.name}))
+                    stats.add_file()
+                    watch_state["processed"].append({"file": p.name, "job_id": job_id, "at": datetime.now(UTC).isoformat()})
+                    watch_state["processed"] = watch_state["processed"][-50:]
+                    logger.info("watch-folder: processing %s", p.name)
+                except Exception as e:
+                    watch_state["errors"].append({"file": p.name, "error": str(e)})
+                    watch_state["errors"] = watch_state["errors"][-50:]
+        except Exception:
+            logger.exception("watch loop error")
+        await asyncio.sleep(5)
 
 
 # ── Operation → tool dispatch for the batch job executor ──
@@ -242,29 +335,86 @@ async def _run_operation(operation: str, params: dict) -> dict:
         return await pdf_manipulate(operation="split", path=path or "", output_dir=str(cfg.upload_dir / "split"))
     if operation == "convert_markdown":
         return await pdf_convert(operation="to_markdown", path=path or "")
-    if operation in ("watermark", "stamp", "highlight", "underline", "header_footer", "page_numbers"):
+    if operation in ("watermark", "stamp", "highlight", "underline", "header_footer", "page_numbers", "summary_box"):
         return await pdf_annotate(operation=operation, path=path or "", text=params.get("text"))
-    if operation in ("list_fields", "fill", "flatten", "export_data"):
-        return await pdf_forms(operation=operation, path=path or "", fields=params.get("fields"))
+    if operation in ("list_fields", "fill", "flatten", "export_data", "auto_fill"):
+        return await pdf_forms(operation=operation, path=path or "", fields=params.get("fields"), source=params.get("source"), text=params.get("text"))
     if operation in ("pdfa", "structure", "accessibility", "integrity", "compare"):
         return await pdf_validate(operation=operation, path=path or "", path_a=params.get("path_a"), path_b=params.get("path_b"))
-    if operation in ("chunk", "index", "search", "list_documents", "delete_index"):
-        return await pdf_rag(operation=operation, path=path, query=params.get("query"), doc_id=params.get("doc_id"))
+    if operation in ("chunk", "index", "search", "similar", "synthesize", "list_documents", "delete_index"):
+        return await pdf_rag(
+            operation=operation,
+            path=path,
+            query=params.get("query"),
+            text=params.get("text"),
+            limit=int(params.get("limit", 10)),
+            doc_id=params.get("doc_id"),
+        )
+    if operation == "analyze":
+        from pdf_mcp.tools.intel import pdf_analyze
+
+        return await pdf_analyze(path=path or "")
+    if operation == "redact":
+        from pdf_mcp.tools.intel import pdf_redact
+
+        return await pdf_redact(path=path or "", pii=bool(params.get("pii", False)), terms=params.get("terms"))
+    if operation == "classify":
+        from pdf_mcp.tools.intel import pdf_classify
+
+        return await pdf_classify(path=path or "")
+    if operation == "dedupe":
+        from pdf_mcp.tools.intel import pdf_dedupe
+
+        return await pdf_dedupe(paths=params.get("paths") or [path] if path else (params.get("paths") or []))
+    if operation == "export_brief":
+        from pdf_mcp.tools.intel import pdf_export
+
+        return await pdf_export(path=path or "", format=params.get("format", "markdown"), include_summary=bool(params.get("include_summary", True)))
+    if operation == "do":
+        from pdf_mcp.tools.agent import pdf_do
+
+        return await pdf_do(task=params.get("task", ""), path=path)
     return {"success": False, "error": f"Unknown operation: {operation}"}
 
 
 async def _execute_job(job_id: str, operation: str, params: dict) -> None:
     jobs.mark_running(job_id)
+    start = time.time()
     try:
         result = await _run_operation(operation, params)
+        stats.record(operation, (time.time() - start) * 1000)
         if result.get("success"):
             result_path = result.get("path") or (result.get("files") or [None])[0]
             jobs.mark_done(job_id, result_path)
         else:
             jobs.mark_done(job_id, None, result.get("error", "operation failed"))
     except Exception as e:
+        stats.record(operation, (time.time() - start) * 1000)
         logger.exception("job %s failed: %s", job_id, e)
         jobs.mark_done(job_id, None, str(e))
+
+
+async def _execute_recipe(job_id: str, recipe: str, steps: list[dict], base_params: dict) -> None:
+    jobs.mark_running(job_id)
+    for idx, step in enumerate(steps):
+        jobs.set_step(job_id, idx)
+        start = time.time()
+        try:
+            op_params = {**base_params, **step.get("params", {})}
+            result = await _run_operation(step["operation"], op_params)
+            stats.record(step["operation"], (time.time() - start) * 1000)
+            jobs.append_step_result(job_id, result)
+            if not result.get("success"):
+                jobs.mark_done(job_id, None, f"{step['operation']} failed: {result.get('error')}")
+                return
+            if idx == len(steps) - 1:
+                result_path = result.get("path") or (result.get("files") or [None])[0]
+                jobs.mark_done(job_id, result_path)
+        except Exception as e:
+            stats.record(step["operation"], (time.time() - start) * 1000)
+            logger.exception("recipe %s step %d failed: %s", recipe, idx, e)
+            jobs.mark_done(job_id, None, str(e))
+            return
 
 
 # ── HTTP app: FastMCP's Starlette app + webapp REST endpoints ──
@@ -397,6 +547,7 @@ def create_http_app():
             return JSONResponse({"error": "file field required"}, status_code=400)
         data = await file.read()
         result = await jobs.upload(file.filename or "upload.pdf", data)
+        stats.add_file()
         return JSONResponse({"job_id": result["job_id"], "pages": result["pages"], "size": result["size"]})
 
     async def list_jobs(request: Request) -> JSONResponse:
@@ -408,7 +559,15 @@ def create_http_app():
         except Exception:
             return JSONResponse({"error": "Invalid JSON payload."}, status_code=400)
         operation = payload.get("operation") or ""
+        recipe = payload.get("recipe") or ""
         params = payload.get("params") or {}
+        if recipe:
+            steps = _recipe_steps(recipe)
+            if not steps:
+                return JSONResponse({"error": f"unknown recipe: {recipe}"}, status_code=400)
+            job_id = jobs.create_job(f"recipe:{recipe}", params, steps=steps)
+            asyncio.create_task(_execute_recipe(job_id, recipe, steps, params))
+            return JSONResponse({"job_id": job_id})
         if not operation:
             return JSONResponse({"error": "operation required"}, status_code=400)
         job_id = jobs.create_job(operation, params)
@@ -454,6 +613,85 @@ def create_http_app():
             return JSONResponse({"error": "File not found"}, status_code=404)
         return FileResponse(path, filename=name)
 
+    async def rag_search(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON payload."}, status_code=400)
+        from pdf_mcp.tools.rag import pdf_rag
+
+        result = await pdf_rag(operation="search", query=payload.get("query", ""), limit=int(payload.get("limit", 10)))
+        return JSONResponse(result)
+
+    async def analyze_file(request: Request) -> JSONResponse:
+        from pdf_mcp.tools.intel import pdf_analyze
+
+        name = request.query_params.get("filename", "")
+        path = jobs.list_uploads().get(name)
+        if not path:
+            return JSONResponse({"error": "File not found"}, status_code=404)
+        result = await pdf_analyze(path=path)
+        return JSONResponse({**result, "filename": name})
+
+    async def compare_files(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON payload."}, status_code=400)
+        uploads = jobs.list_uploads()
+        path_a = uploads.get(payload.get("path_a", ""))
+        path_b = uploads.get(payload.get("path_b", ""))
+        if not path_a or not path_b:
+            return JSONResponse({"error": "Both files must be uploaded first."}, status_code=400)
+        from pdf_mcp.tools.validate import pdf_validate
+
+        result = await pdf_validate(operation="compare", path=path_a, path_a=path_a, path_b=path_b)
+        return JSONResponse(result)
+
+    async def dedupe_files(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON payload."}, status_code=400)
+        uploads = jobs.list_uploads()
+        names = payload.get("filenames") or []
+        paths = [uploads[n] for n in names if n in uploads]
+        if not paths:
+            return JSONResponse({"error": "No matching uploaded files."}, status_code=400)
+        from pdf_mcp.tools.intel import pdf_dedupe
+
+        result = await pdf_dedupe(paths=paths, threshold=float(payload.get("threshold", 0.85)))
+        return JSONResponse(result)
+
+    async def list_recipes(request: Request) -> JSONResponse:
+        return JSONResponse({"recipes": [{"name": name, "steps": [s["operation"] for s in steps]} for name, steps in RECIPES.items()]})
+
+    async def create_share(request: Request) -> JSONResponse:
+        job = jobs.get_job(request.path_params.get("job_id", ""))
+        if not job or job["status"] != "completed" or not job["result_path"]:
+            return JSONResponse({"error": "Job not completed"}, status_code=409)
+        token = shares.create(job["job_id"])
+        return JSONResponse({"url": f"/api/share/{token}"})
+
+    async def resolve_share(request: Request) -> FileResponse | JSONResponse:
+        token = request.path_params.get("token", "")
+        job_id = shares.resolve(token)
+        if not job_id:
+            return JSONResponse({"error": "Share link expired or not found"}, status_code=410)
+        job = jobs.get_job(job_id)
+        if not job or not job["result_path"]:
+            return JSONResponse({"error": "Job result missing"}, status_code=404)
+        path = Path(job["result_path"])
+        if not path.exists():
+            return JSONResponse({"error": "Result file missing"}, status_code=404)
+        return FileResponse(path, filename=path.name)
+
+    async def get_stats(request: Request) -> JSONResponse:
+        return JSONResponse(stats.snapshot())
+
+    async def watch_status(request: Request) -> JSONResponse:
+        return JSONResponse(watch_state)
+
     app.add_route("/api/health", health)
     app.add_route("/api/v1/diagnostics", diagnostics)
     app.add_route("/api/tools", list_tools)
@@ -463,6 +701,15 @@ def create_http_app():
     app.add_route("/api/chat", chat, methods=["POST"])
     app.add_route("/api/pdf/upload", upload_pdf, methods=["POST"])
     app.add_route("/api/pdf/files/{name}", get_uploaded_file)
+    app.add_route("/api/pdf/analyze", analyze_file)
+    app.add_route("/api/pdf/compare", compare_files, methods=["POST"])
+    app.add_route("/api/pdf/dedupe", dedupe_files, methods=["POST"])
+    app.add_route("/api/rag/search", rag_search, methods=["POST"])
+    app.add_route("/api/recipes", list_recipes)
+    app.add_route("/api/share/{job_id}", create_share, methods=["POST"])
+    app.add_route("/api/share/{token}", resolve_share)
+    app.add_route("/api/stats", get_stats)
+    app.add_route("/api/watch/status", watch_status)
     app.add_route("/api/jobs", list_jobs)
     app.add_route("/api/jobs", create_job, methods=["POST"])
     app.add_route("/api/jobs/{job_id}", get_job)
@@ -494,6 +741,7 @@ def main():
     logging.getLogger("pdf-mcp").addHandler(_log_ring)
 
     if args.mode == "http":
+        threading.Thread(target=lambda: asyncio.run(_watch_loop()), daemon=True).start()
         http_app = create_http_app()
 
         logger.info("Starting HTTP server on %s:%s", args.host, args.port)

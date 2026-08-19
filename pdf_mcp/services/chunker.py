@@ -113,6 +113,35 @@ class Chunker:
         except Exception:
             return []
 
+    def chunk_with_tables(self, text: str, tables: list[list[list]] | None, metadata: dict, chunk_size: int = 1000, overlap: int = 200) -> list[dict]:
+        """Chunk body text and emit each table as its own structured chunk (section='table')."""
+        try:
+            doc_id = metadata.get("doc_id", "unknown")
+            chunks: list[dict] = []
+            for ti, table in enumerate(tables or []):
+                if not table or not any(any(c is not None and str(c).strip() for c in row) for row in table):
+                    continue
+                md_rows = []
+                for row in table:
+                    md_rows.append("| " + " | ".join("" if c is None else str(c).strip().replace("|", "\\|") for c in row) + " |")
+                header = f"table_{ti + 1}"
+                body = f"Table {ti + 1}:\n" + "\n".join(md_rows)
+                chunks.append(
+                    {
+                        "doc_id": doc_id,
+                        "chunk_id": f"{doc_id}_t{ti}",
+                        "page_num": metadata.get("page_num", 0),
+                        "text": body,
+                        "section": "table",
+                        "metadata": {**metadata, "table_index": ti, "table_name": header},
+                    }
+                )
+            body_chunks = self.chunk_recursive(text, metadata, chunk_size=chunk_size, overlap=overlap)
+            chunks.extend(body_chunks)
+            return chunks
+        except Exception:
+            return []
+
     def _recursive_split(
         self,
         text: str,

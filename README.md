@@ -10,7 +10,7 @@
 
 Full-stack **PDF intelligence** MCP server — extract, manipulate, annotate, convert, validate, and RAG-search PDFs through a unified tool surface and React workbench.
 
-**v0.1.0** · Ports **11130** (frontend) / **11131** (backend)
+**v0.2.0** · Ports **11130** (frontend) / **11131** (backend)
 
 > FastMCP 3.4.4 · PyMuPDF + pypdf + pdfplumber · LanceDB RAG · Prefab UI · dual transport (stdio + HTTP)
 
@@ -18,11 +18,13 @@ Full-stack **PDF intelligence** MCP server — extract, manipulate, annotate, co
 
 - **pdf_extract** — text, images, tables, metadata, fonts, links, outline
 - **pdf_manipulate** — merge, split, rotate, reorder, delete pages, compress, encrypt/decrypt, optimize
-- **pdf_annotate** — watermark, stamp, highlight, underline, header/footer, page numbers
-- **pdf_forms** — list / fill / flatten / export form fields
+- **pdf_annotate** — watermark, stamp, highlight, underline, header/footer, page numbers, auto summary box
+- **pdf_forms** — list / fill / flatten / export + LLM-guided auto-fill
 - **pdf_convert** — PDF ↔ Markdown / images / HTML
 - **pdf_validate** — PDF/A, structure, accessibility, integrity, compare
-- **pdf_rag** — chunk, index (LanceDB), semantic search
+- **pdf_rag** — chunk (table-aware), index (LanceDB), semantic search, query-by-example, cross-document synthesis
+- **pdf_analyze / pdf_redact / pdf_classify / pdf_dedupe / pdf_export** — intelligence tools
+- **pdf_do** — autonomous agent that chains the tools from natural language
 - **pdf_help / pdf_status / pdf_shutdown** — meta tools
 
 ## Quick start
@@ -49,11 +51,13 @@ Dashboard: http://127.0.0.1:11130 · MCP/API: http://127.0.0.1:11131
 |------|-----------|
 | `pdf_extract` | text, images, tables, metadata, fonts, links, outline |
 | `pdf_manipulate` | merge, split, rotate, reorder, delete_pages, compress, encrypt, decrypt, optimize |
-| `pdf_annotate` | watermark, stamp, highlight, underline, header_footer, page_numbers |
-| `pdf_forms` | list_fields, fill, flatten, export_data |
+| `pdf_annotate` | watermark, stamp, highlight, underline, header_footer, page_numbers, summary_box |
+| `pdf_forms` | list_fields, fill, flatten, export_data, auto_fill |
 | `pdf_convert` | to_markdown, to_images, to_html, from_html, from_markdown, from_images |
 | `pdf_validate` | pdfa, structure, accessibility, integrity, compare |
-| `pdf_rag` | chunk, index, search, list_documents, delete_index |
+| `pdf_rag` | chunk, index, search, similar, synthesize, list_documents, delete_index |
+| `pdf_analyze` / `pdf_redact` / `pdf_classify` / `pdf_dedupe` / `pdf_export` | intelligence |
+| `pdf_do` | agentic chaining |
 | `pdf_help` / `pdf_status` / `pdf_shutdown` | meta |
 
 ## Claude Desktop config

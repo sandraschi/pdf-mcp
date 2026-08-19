@@ -238,6 +238,46 @@ async def pdf_annotate(
                 }
             finally:
                 doc.close()
+
+        elif operation == "summary_box":
+            try:
+                from pdf_mcp.services.llm import chat_completion
+
+                doc: fitz.Document = fitz.open(path)
+                try:
+                    doc_text = " ".join(str(doc[i].get_text()) for i in range(min(len(doc), 10)))
+                finally:
+                    doc.close()
+                summary = await chat_completion(
+                    [
+                        {"role": "system", "content": "Write a 2-3 sentence factual summary of the document."},
+                        {"role": "user", "content": doc_text[:6000]},
+                    ]
+                )
+            except Exception as e:
+                logger.exception("pdf_annotate summary_box LLM failed: %s", e)
+                return {"success": False, "error": f"summary_box requires a local LLM: {e}"}
+            doc: fitz.Document = fitz.open(path)
+            try:
+                first = doc[0]
+                rect = first.rect
+                y = rect.y0 + 15
+                for line in summary.splitlines():
+                    if not line.strip():
+                        continue
+                    if y > rect.y0 + 220:
+                        break
+                    first.insert_text(fitz.Point(rect.x0 + 50, y), line.strip(), fontsize=10, color=(0.1, 0.1, 0.1))
+                    y += 16
+                doc.save(op, garbage=4, deflate=True)
+                return {
+                    "success": True,
+                    "path": op,
+                    "summary": summary,
+                    "message": f"Added summary box to page 1 of {Path(path).name}, saved to {Path(op).name}.",
+                }
+            finally:
+                doc.close()
     except Exception as e:
         logger.exception("pdf_annotate %s failed: %s", operation, e)
         return {"success": False, "error": str(e), "error_type": type(e).__name__}

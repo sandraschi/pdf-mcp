@@ -24,6 +24,7 @@ class RagStore:
                         "page_num": 0,
                         "text": "",
                         "section": "",
+                        "source_file": "",
                         "metadata": {},
                     }
                 ],
@@ -36,6 +37,7 @@ class RagStore:
                 return {"success": True, "count": 0}
             data = []
             for chunk, vec in zip(chunks, embeddings):
+                meta = chunk.get("metadata") or {}
                 data.append(
                     {
                         "vector": vec,
@@ -44,10 +46,20 @@ class RagStore:
                         "page_num": chunk.get("page_num", 0),
                         "text": chunk.get("text", ""),
                         "section": chunk.get("section") or "",
-                        "metadata": chunk.get("metadata", {}),
+                        "source_file": meta.get("source_file", "") or "",
+                        "metadata": {},
                     }
                 )
-            self._table.add(data)
+            try:
+                self._table.add(data)
+            except Exception as add_err:
+                if "does not exist in table schema" in str(add_err):
+                    # stale table from an older schema - rebuild with the current columns
+                    self._db.drop_table(self._table_name)
+                    self._ensure_table()
+                    self._table.add(data)
+                else:
+                    raise
             for chunk, vec in zip(chunks, embeddings):
                 doc_id = chunk.get("doc_id", "unknown")
                 self._doc_counts[doc_id] = self._doc_counts.get(doc_id, 0) + 1
@@ -60,6 +72,7 @@ class RagStore:
             results = self._table.search(query_embedding).limit(limit).to_list()
             clean = []
             for r in results:
+                meta = r.get("metadata") or {}
                 clean.append(
                     {
                         "doc_id": r.get("doc_id", ""),
@@ -67,7 +80,8 @@ class RagStore:
                         "page_num": r.get("page_num", 0),
                         "text": r.get("text", ""),
                         "section": r.get("section"),
-                        "metadata": r.get("metadata", {}),
+                        "source_file": meta.get("source_file") or r.get("source_file"),
+                        "metadata": meta,
                         "_distance": r.get("_distance"),
                     }
                 )

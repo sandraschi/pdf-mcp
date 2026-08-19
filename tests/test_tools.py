@@ -156,3 +156,76 @@ class TestRagStore:
             import shutil
 
             shutil.rmtree(db_dir, ignore_errors=True)
+
+
+class TestIntel:
+    def test_analyzer_detects_digital(self, sample_pdf):
+        from pdf_mcp.services.intel import Analyzer
+
+        result = Analyzer.analyze(sample_pdf)
+        assert result["success"] is True
+        assert result["has_text_layer"] is True
+        assert result["scanned"] is False
+        assert result["layout_hint"] == "digital"
+
+    def test_classifier_detects_letter(self, sample_pdf):
+        from pdf_mcp.services.intel import Classifier
+
+        result = Classifier.classify(sample_pdf)
+        assert result["success"] is True
+        assert result["doc_type"] in ("letter", "other", "report")
+
+    def test_redactor_removes_pii(self, sample_pdf):
+        from pdf_mcp.services.intel import Redactor
+
+        out = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False).name
+        try:
+            result = Redactor.redact(sample_pdf, out, pii=True)
+            assert result["success"] is True
+            assert os.path.exists(out)
+        finally:
+            if os.path.exists(out):
+                os.unlink(out)
+
+    def test_deduper_finds_exact_duplicates(self, sample_pdf):
+        from pdf_mcp.services.intel import Deduper
+
+        result = Deduper.dedupe([sample_pdf, sample_pdf], threshold=0.85)
+        assert result["success"] is True
+        assert len(result["exact_duplicates"]) == 1
+
+    def test_brief_builder(self, sample_pdf):
+        from pdf_mcp.services.intel import BriefBuilder
+
+        result = BriefBuilder.build(sample_pdf, format="markdown")
+        assert result["success"] is True
+        assert result["path"].endswith("_brief.md")
+
+    def test_chunk_with_tables(self):
+        from pdf_mcp.services.chunker import Chunker
+
+        chunker = Chunker()
+        tables = [[["Q1", "100"], ["Q2", "200"]]]
+        chunks = chunker.chunk_with_tables("Some body text about growth.", tables, {"doc_id": "t"})
+        assert any(c["section"] == "table" for c in chunks)
+
+
+class TestRagOps:
+    def test_rag_similar_and_synthesize(self, sample_pdf):
+        import asyncio
+
+        from pdf_mcp.tools.rag import pdf_rag
+
+        async def run():
+            idx = await pdf_rag(operation="index", path=sample_pdf)
+            assert idx["success"] is True
+            s = await pdf_rag(operation="search", query="Hello PDF MCP")
+            assert s["success"] is True
+            assert len(s["results"]) >= 1
+            assert s["results"][0].get("source_file")
+            sim = await pdf_rag(operation="similar", text="Hello PDF MCP")
+            assert sim["success"] is True
+            syn = await pdf_rag(operation="synthesize", query="Hello PDF MCP", limit=5)
+            assert syn["success"] is True
+
+        asyncio.run(run())

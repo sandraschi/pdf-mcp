@@ -66,4 +66,4 @@ bootstrap:
 
 # Package an MCPB bundle (requires @anthropic-ai/mcpb CLI)
 mcpb-pack:
-    npx @anthropic-ai/mcpb pack . dist/pdf-mcp-0.1.0.mcpb
+    npx @anthropic-ai/mcpb pack . dist/pdf-mcp-0.2.0.mcpb

@@ -1,8 +1,9 @@
-import { fetchChat, fetchSkillContent, fetchSkills } from "@/lib/api";
+import { type RagHit, fetchChat, fetchSkillContent, fetchSkills, ragSearch } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { motion } from "framer-motion";
-import { Cpu, Download, Eraser, MessageSquare, Send } from "lucide-react";
+import { Cpu, Download, Eraser, ExternalLink, MessageSquare, Search, Send } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const STORAGE_KEY = "pdf-mcp-chat-history";
 const PERSONALITY_KEY = "pdf-mcp-chat-personality";
@@ -70,11 +71,16 @@ function saveHistory(msgs: Message[]) {
 }
 
 export default function Chat() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>(loadHistory);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [personality, setPersonality] = useState(() => localStorage.getItem(PERSONALITY_KEY) || "research-assistant");
   const [skillText, setSkillText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchHits, setSearchHits] = useState<RagHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const providers = useStore((s) => s.providers);
   const llmAvailable = useStore((s) => s.llmAvailable);
@@ -136,6 +142,27 @@ export default function Chat() {
     }
     setLoading(false);
   }, [input, loading, messages, personality, skillText, llmProvider, llmModel]);
+
+  const runSearch = useCallback(async () => {
+    if (!searchQuery.trim() || searching) return;
+    setSearching(true);
+    setSearchOpen(true);
+    try {
+      const hits = await ragSearch(searchQuery, 8);
+      setSearchHits(hits);
+    } catch (e) {
+      setSearchHits([]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `Search failed: ${e instanceof Error ? e.message : "Request failed"}`, ts: new Date().toISOString() },
+      ]);
+    }
+    setSearching(false);
+  }, [searchQuery, searching]);
+
+  const openInWorkbench = (file: string, page: number) => {
+    navigate(`/workbench?file=${encodeURIComponent(file)}&page=${page}`);
+  };
 
   const handleExport = () => {
     if (messages.length === 0) return;
@@ -233,6 +260,67 @@ export default function Chat() {
       </div>
 
       <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl flex flex-col min-h-0 overflow-hidden">
+        <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-2" data-testid="search-pdfs">
+          <button
+            type="button"
+            onClick={() => setSearchOpen((o) => !o)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+            title="Toggle PDF search"
+          >
+            <Search size={13} />
+            Search PDFs
+          </button>
+          {searchOpen && (
+            <div className="flex-1 flex gap-1.5">
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") runSearch();
+                }}
+                placeholder="Search the indexed PDFs..."
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                data-testid="rag-search-input"
+              />
+              <button
+                type="button"
+                onClick={runSearch}
+                disabled={searching || !searchQuery.trim()}
+                className="px-3 py-1.5 bg-amber-500 text-black rounded-lg text-xs font-medium hover:bg-amber-400 disabled:opacity-40"
+                data-testid="rag-search-btn"
+              >
+                {searching ? "..." : "Go"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {searchOpen && searchHits.length > 0 && (
+          <div className="px-3 py-2 border-b border-zinc-800 max-h-48 overflow-y-auto space-y-2" data-testid="rag-sources">
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Sources</p>
+            {searchHits.map((hit, i) => (
+              <div key={`${hit.chunk_id}-${i}`} className="bg-zinc-800/60 rounded-lg px-3 py-2 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-zinc-300 truncate">
+                    {hit.source_file || hit.doc_id}
+                    <span className="text-zinc-500"> · page {hit.page_num}</span>
+                    {hit.section === "table" && <span className="ml-1 text-amber-400">table</span>}
+                  </p>
+                  <p className="text-xs text-zinc-500 line-clamp-2 mt-0.5">{hit.text}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => hit.source_file && openInWorkbench(hit.source_file, hit.page_num)}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-700 text-xs text-zinc-200 hover:bg-zinc-600 shrink-0"
+                  data-testid="open-page-btn"
+                >
+                  <ExternalLink size={11} /> Open
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-4 space-y-4" data-testid="chat-messages">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
