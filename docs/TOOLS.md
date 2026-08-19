@@ -64,6 +64,18 @@ pdf-mcp exposes 16 MCP tools. Each domain tool is a portmanteau: one tool name, 
 | `/api/watch/status` | GET | Watch-folder status |
 | `/mcp` | POST | MCP streamable HTTP transport |
 
+## Prompts, Skills, and Resources
+
+| Kind | Name | Purpose |
+|------|------|---------|
+| Prompt | `analyze_document` / `summarize_document` / `extract_tables` / `rag_question` / `redact_review` / `compare_documents` | Workflow templates guiding the agent through the tools |
+| Skill | `skill://pdf-expert` | Registered via `SkillsDirectoryProvider` (exposes SKILL.md + manifest) |
+| Resource | `config://server` | Config snapshot (mode, ports, paths) |
+| Resource | `status://server` | Live status (version, tool count, uptime) |
+
+Sampling: the server routes `createMessage` sampling to the local LLM; `pdf_do`
+uses `ctx.sample()` when the client supports it and falls back to direct calls.
+
 ## Pipelines
 
 `POST /api/jobs` with `{"recipe": "ingest"|"redact_export"|"brief", "params": {...}}`

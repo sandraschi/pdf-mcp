@@ -183,6 +183,19 @@ LLM summarizes the document and stamps the summary onto page 1.
 | `pdf_status` | Server status, version, uptime, tool count, mode |
 | `pdf_shutdown` | Gracefully stop the server |
 
+## Prompts, Skills, and Resources
+
+- **Prompts** (`@mcp.prompt()`): `analyze_document`, `summarize_document`,
+  `extract_tables`, `rag_question`, `redact_review`, `compare_documents`.
+- **Skills** (`SkillsDirectoryProvider`): the `pdf_mcp/skills/` directory is
+  registered as an MCP skills provider - `skill://pdf-expert/SKILL.md` and
+  `skill://pdf-expert/_manifest` are discoverable by MCP clients.
+- **Resources** (`@mcp.resource()`): `config://server` (config snapshot) and
+  `status://server` (live status).
+- **Sampling**: the server registers a sampling handler routed to the local LLM
+  (Ollama / LM Studio). `pdf_do` uses `ctx.sample()` when the client supports
+  sampling and falls back to direct local-LLM calls otherwise.
+
 ## Architecture
 
 ```

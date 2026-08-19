@@ -1,6 +1,6 @@
 [project]
 name = "pdf-mcp"
-version = "0.2.0"
+version = "0.2.1"
 description = "Full-stack PDF intelligence MCP server — extract, manipulate, annotate, convert, validate, and RAG-search PDFs"
 authors = [{ name = "Sandra Schipal" }]
 requires-python = ">=3.12"

@@ -10,7 +10,7 @@
 
 Full-stack **PDF intelligence** MCP server — extract, manipulate, annotate, convert, validate, and RAG-search PDFs through a unified tool surface and React workbench.
 
-**v0.2.0** · Ports **11130** (frontend) / **11131** (backend)
+**v0.2.1** · Ports **11130** (frontend) / **11131** (backend)
 
 > FastMCP 3.4.4 · PyMuPDF + pypdf + pdfplumber · LanceDB RAG · Prefab UI · dual transport (stdio + HTTP)
 

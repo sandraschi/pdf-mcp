@@ -11,6 +11,7 @@ from pydantic import Field
 from pdf_mcp.config import cfg
 from pdf_mcp.models import PdfAnnotateOperation
 from pdf_mcp.server import mcp
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 
@@ -48,7 +49,7 @@ def _watermark_position(rect: fitz.Rect, position: str, text: str, font_size: in
     return [pos_map.get(position, (pw / 2 - tw / 2, ph / 2))]
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
 async def pdf_annotate(
     operation: PdfAnnotateOperation,
     path: Annotated[str, Field(description="Path to the PDF file.")],

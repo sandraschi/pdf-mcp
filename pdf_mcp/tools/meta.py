@@ -9,12 +9,13 @@ from pydantic import Field
 
 from pdf_mcp.config import cfg
 from pdf_mcp.server import mcp
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 _start_time = time.time()
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, app=True, annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_help(
     tool_name: Annotated[str | None, Field(description="Name of a tool to get detailed help for. Lists all tools if omitted.")] = None,
 ) -> dict:
@@ -61,7 +62,7 @@ async def pdf_help(
         return {"success": False, "error": str(e), "error_type": type(e).__name__}
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, app=True, annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_status() -> dict:
     """Report server status, version, uptime, and registered tool count.
 
@@ -96,7 +97,7 @@ async def pdf_status() -> dict:
         return {"success": False, "error": str(e), "error_type": type(e).__name__}
 
 
-@mcp.tool(annotations=ToolAnnotations(destructiveHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(destructiveHint=True))
 async def pdf_shutdown(reason: Annotated[str | None, Field(description="Optional shutdown reason.")] = None) -> dict:
     """Gracefully shut down the pdf-mcp server.
 

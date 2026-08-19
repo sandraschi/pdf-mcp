@@ -9,6 +9,7 @@ from pydantic import Field
 
 from pdf_mcp.models import PdfValidateOperation
 from pdf_mcp.server import mcp
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 
@@ -29,7 +30,7 @@ def _page_count(path: str) -> int:
         doc.close()
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_validate(
     operation: PdfValidateOperation,
     path: Annotated[str, Field(description="Path to the PDF file. Ignored for compare.")],

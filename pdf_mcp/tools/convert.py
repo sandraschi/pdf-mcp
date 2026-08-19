@@ -11,6 +11,7 @@ from pdf_mcp.config import cfg
 from pdf_mcp.models import PdfConvertOperation
 from pdf_mcp.server import mcp
 from pdf_mcp.services.converter import Converter
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 converter = Converter()
@@ -31,7 +32,7 @@ def _out_path_no_input(op: str, ext: str = ".pdf") -> str:
     return str(cfg.upload_dir / f"output_{op}_{ts}_{uid}{ext}")
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
 async def pdf_convert(
     operation: PdfConvertOperation,
     path: Annotated[str | None, Field(description="Path to the PDF file. Required for to_* operations.")] = None,

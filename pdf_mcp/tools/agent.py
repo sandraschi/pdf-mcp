@@ -2,11 +2,13 @@ import json
 import logging
 from typing import Annotated
 
+from fastmcp import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from pdf_mcp.server import mcp
 from pdf_mcp.services.llm import chat_completion
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 
@@ -25,6 +27,26 @@ ALLOWED_TOOLS: dict[str, tuple[str, ...]] = {
 }
 
 MAX_STEPS = 6
+
+
+async def _llm_call(messages: list[dict], ctx: Context | None, system_prompt: str | None = None) -> str:
+    """Use client sampling when available (ctx.sample), else direct local LLM."""
+    if ctx is not None:
+        try:
+            from mcp.types import SamplingMessage, TextContent
+
+            sampling_messages = [
+                SamplingMessage(
+                    role=m.get("role", "user"),
+                    content=TextContent(type="text", text=str(m.get("content", ""))),
+                )
+                for m in messages
+            ]
+            result = await ctx.sample(sampling_messages, system_prompt=system_prompt, result_type=str)
+            return result if isinstance(result, str) else str(result)
+        except Exception as e:
+            logger.debug("ctx.sample unavailable (%s); falling back to direct LLM", e)
+    return await chat_completion(messages)
 
 
 async def _call_tool(name: str, args: dict) -> dict:
@@ -53,15 +75,16 @@ async def _call_tool(name: str, args: dict) -> dict:
     return result
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True, idempotentHint=False))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True, idempotentHint=False))
 async def pdf_do(
     task: Annotated[str, Field(description="Natural-language task to perform with the PDF tooling.")],
     path: Annotated[str | None, Field(description="Path to a PDF file if the task targets one.")] = None,
+    ctx: Context | None = None,
 ) -> dict:
     """Chain the PDF tools autonomously to complete a natural-language task.
 
-    Requires a local LLM (Ollama or LM Studio). The LLM plans up to 6 tool calls
-    from the pdf_* surface, the server executes them, and the LLM writes the final
+    Requires a local LLM (Ollama or LM Studio) or a client that supports MCP
+    sampling. The LLM plans up to 6 tool calls from the pdf_* surface, the server
     answer. pdf_do cannot call itself or pdf_shutdown.
 
     ## Return Format
@@ -90,11 +113,10 @@ async def pdf_do(
             "any step that needs a source file. Reply with JSON only, shape:\n"
             '{"steps": [...]}\n\nAllowed tools:\n' + allowed_desc
         )
-        plan_reply = await chat_completion(
-            [
-                {"role": "system", "content": plan_prompt},
-                {"role": "user", "content": f"Task: {task}\nPDF path: {path}"},
-            ]
+        plan_reply = await _llm_call(
+            [{"role": "user", "content": f"Task: {task}\nPDF path: {path}"}],
+            ctx,
+            system_prompt=plan_prompt,
         )
         start, end = plan_reply.find("{"), plan_reply.rfind("}")
         if start == -1 or end == -1:
@@ -128,11 +150,10 @@ async def pdf_do(
                 break
 
         transcript = "\n".join(f"step {i + 1} {r['tool']}({json.dumps(r['args'], ensure_ascii=False)}): {json.dumps(r['result'], ensure_ascii=False)[:600]}" for i, r in enumerate(records))
-        answer = await chat_completion(
-            [
-                {"role": "system", "content": "You are the pdf-mcp agent. Summarize what was done and the outcome for the user, in 2-4 sentences. Be concrete; mention numbers and file paths."},
-                {"role": "user", "content": f"Task: {task}\n\nExecution transcript:\n{transcript}"},
-            ]
+        answer = await _llm_call(
+            [{"role": "user", "content": f"Task: {task}\n\nExecution transcript:\n{transcript}"}],
+            ctx,
+            system_prompt="You are the pdf-mcp agent. Summarize what was done and the outcome for the user, in 2-4 sentences. Be concrete; mention numbers and file paths.",
         )
         return {
             "success": True,

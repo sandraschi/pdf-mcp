@@ -12,6 +12,7 @@ from pdf_mcp.models import PdfRagOperation
 from pdf_mcp.server import mcp
 from pdf_mcp.services.chunker import Chunker
 from pdf_mcp.services.rag_store import RagStore
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 chunker = Chunker()
@@ -84,7 +85,7 @@ def _extract_tables(path: str) -> list:
         return []
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_rag(
     operation: PdfRagOperation,
     path: Annotated[str | None, Field(description="Path to the PDF file. Required for chunk, index operations.")] = None,

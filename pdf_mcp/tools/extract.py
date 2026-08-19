@@ -11,6 +11,7 @@ from pdf_mcp.config import cfg
 from pdf_mcp.models import PdfExtractOperation
 from pdf_mcp.server import mcp
 from pdf_mcp.services.extractor import Extractor
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 extractor = Extractor()
@@ -30,7 +31,7 @@ def _parse_page_range(s: str | None) -> list[int] | None:
     return sorted(pages)
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_extract(
     operation: PdfExtractOperation,
     path: Annotated[str, Field(description="Path to the PDF file.")],

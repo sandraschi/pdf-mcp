@@ -11,6 +11,7 @@ from pdf_mcp.config import cfg
 from pdf_mcp.models import PdfManipulateOperation
 from pdf_mcp.server import mcp
 from pdf_mcp.services.manipulator import Manipulator
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 manipulator = Manipulator()
@@ -44,7 +45,7 @@ def _parse_page_range(s: str) -> list[int]:
     return sorted(pages)
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
 async def pdf_manipulate(
     operation: PdfManipulateOperation,
     path: Annotated[str, Field(description="Path to the PDF file. Ignored for merge.")],

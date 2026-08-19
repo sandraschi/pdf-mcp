@@ -22,7 +22,7 @@ class Config:
 
     # Server identity
     server_name: str = "pdf-mcp"
-    version: str = "0.2.0"
+    version: str = "0.2.1"
     server_description: str = "Full-stack PDF intelligence — extract, manipulate, annotate, convert, validate, RAG-search"
 
     def ensure_dirs(self) -> None:

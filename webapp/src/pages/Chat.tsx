@@ -2,7 +2,7 @@ import { type RagHit, fetchChat, fetchSkillContent, fetchSkills, ragSearch } fro
 import { useStore } from "@/lib/store";
 import { motion } from "framer-motion";
 import { Cpu, Download, Eraser, ExternalLink, MessageSquare, Search, Send } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const STORAGE_KEY = "pdf-mcp-chat-history";
@@ -81,6 +81,7 @@ export default function Chat() {
   const [searchHits, setSearchHits] = useState<RagHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const providers = useStore((s) => s.providers);
   const llmAvailable = useStore((s) => s.llmAvailable);
@@ -90,6 +91,15 @@ export default function Chat() {
   const setLlmProvider = useStore((s) => s.setLlmProvider);
   const setLlmModel = useStore((s) => s.setLlmModel);
   const discoverLlm = useStore((s) => s.discoverLlm);
+
+  useEffect(() => {
+    const onFocus = () => {
+      setSearchOpen(true);
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("pdf-search-focus", onFocus);
+    return () => window.removeEventListener("pdf-search-focus", onFocus);
+  }, []);
 
   useEffect(() => {
     discoverLlm();
@@ -273,6 +283,7 @@ export default function Chat() {
           {searchOpen && (
             <div className="flex-1 flex gap-1.5">
               <input
+                ref={searchInputRef}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {

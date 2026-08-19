@@ -13,6 +13,7 @@ from uuid import uuid4
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
+from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
@@ -25,10 +26,40 @@ logger = logging.getLogger("pdf-mcp")
 
 # ── FastMCP app ──
 
+
+async def _sampling_handler(messages, params, ctx) -> str:
+    """Server-side sampling fallback routed to the local LLM (Ollama / LM Studio)."""
+    from pdf_mcp.services.llm import chat_completion
+
+    texts = []
+    for m in messages or []:
+        role = getattr(m, "role", "user")
+        content = getattr(m, "content", "")
+        if not isinstance(content, str):
+            content = getattr(content, "text", str(content))
+        texts.append(f"{role}: {content}")
+    prompt = "\n".join(texts) if texts else ""
+    system = getattr(params, "instructions", None) or getattr(params, "system_prompt", None)
+    msgs = []
+    if system:
+        msgs.append({"role": "system", "content": system})
+    msgs.append({"role": "user", "content": prompt})
+    try:
+        return await chat_completion(msgs)
+    except Exception:
+        provider, model, _ = await _llm_default_provider()
+        if not provider:
+            return "No local LLM available for sampling. Start Ollama or LM Studio."
+        raise
+
+
 mcp = FastMCP(
     cfg.server_name,
     instructions=cfg.server_description,
     version=cfg.version,
+    providers=[SkillsDirectoryProvider(roots=str(Path(__file__).resolve().parent / "skills"))],
+    sampling_handler=_sampling_handler,
+    sampling_handler_behavior="fallback",
 )
 
 

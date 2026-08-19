@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1 (2026-08-19)
+
+- **FastMCP skills + prompts + resources + sampling** (closes remaining MEDIUMs M3-M6):
+  - `SkillsDirectoryProvider` registers `pdf_mcp/skills/` - `skill://pdf-expert` discoverable by MCP clients.
+  - 6 `@mcp.prompt()` workflow templates (analyze, summarize, tables, RAG, redact, compare).
+  - `@mcp.resource()` for `config://server` and `status://server`.
+  - `output_schema=` on every tool (TOOL_DESIGN_STANDARDS §8).
+  - `app=True` Prefab cards on list/status/stats tools (pdf_help, pdf_status, pdf_analyze, pdf_classify, pdf_dedupe).
+  - Sampling handler routes `createMessage` to the local LLM; `pdf_do` now accepts `ctx` and uses
+    `ctx.sample()` with direct-LLM fallback.
+- **Webapp keyboard shortcuts + zoom** (closes LOW L7):
+  - `useZoom` hook: Ctrl+Scroll cycles {0.5..3.0}, Ctrl+0 resets, persisted to `tauri-zoom`, indicator in Topbar.
+  - Ctrl+L -> /logs, Ctrl+H -> /tools, Ctrl+K -> focuses Chat PDF search.
+
 ## 0.2.0 (2026-08-19)
 
 - **Intelligence 2.0 feature set** (see `SPEC.md`): 22 features across RAG, extraction,

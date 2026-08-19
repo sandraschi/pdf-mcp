@@ -11,6 +11,7 @@ from pdf_mcp.config import cfg
 from pdf_mcp.server import mcp
 from pdf_mcp.services.intel import Analyzer, BriefBuilder, Classifier, Deduper, Redactor
 from pdf_mcp.services.llm import chat_completion
+from pdf_mcp.tools._schema import TOOL_OUTPUT_SCHEMA
 
 logger = logging.getLogger("pdf-mcp")
 
@@ -23,7 +24,7 @@ def _out_path(path: str, op: str) -> str:
     return str(cfg.upload_dir / f"{p.stem}_{op}_{ts}_{uid}.pdf")
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, app=True, annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_analyze(path: Annotated[str, Field(description="Path to the PDF file.")]) -> dict:
     """Detect whether a PDF has a text layer (digital) or is scanned, with layout stats.
 
@@ -49,7 +50,7 @@ async def pdf_analyze(path: Annotated[str, Field(description="Path to the PDF fi
     return Analyzer.analyze(path)
 
 
-@mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(destructiveHint=True, openWorldHint=True))
 async def pdf_redact(
     path: Annotated[str, Field(description="Path to the PDF file to redact.")],
     terms: Annotated[list[str] | None, Field(description="Exact phrases to blacken.")] = None,
@@ -90,7 +91,7 @@ async def pdf_redact(
         return {"success": False, "error": str(e), "error_type": type(e).__name__}
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, app=True, annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_classify(
     path: Annotated[str, Field(description="Path to the PDF file.")],
     refine: Annotated[bool, Field(description="Use the local LLM to refine the guess. Default true.")] = True,
@@ -155,7 +156,7 @@ DOC_TYPES = {
 }
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, app=True, annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_dedupe(
     paths: Annotated[list[str], Field(description="List of PDF paths to check for duplicates.")],
     threshold: Annotated[float, Field(description="Similarity threshold 0-1. Default 0.85.")] = 0.85,
@@ -183,7 +184,7 @@ async def pdf_dedupe(
         return {"success": False, "error": str(e), "error_type": type(e).__name__}
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
+@mcp.tool(output_schema=TOOL_OUTPUT_SCHEMA, annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
 async def pdf_export(
     path: Annotated[str, Field(description="Path to the PDF file.")],
     format: Annotated[Literal["markdown", "json"], Field(description="Output format. Default markdown.")] = "markdown",
