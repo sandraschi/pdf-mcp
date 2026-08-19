@@ -35,7 +35,7 @@ Modify PDF structure and properties.
 
 | Operation | Parameters | Returns |
 |-----------|-----------|---------|
-| `merge` | paths (list of PDF paths) | `{path, pages}` |
+| `merge` | path (unused), paths (list of PDF paths) | `{path, pages}` |
 | `split` | path, output_dir, ranges (optional page ranges) | `{files: [path, ...]}` |
 | `rotate` | path, pages (range), angle (default 90) | `{path}` |
 | `reorder` | path, new_order (1-indexed list) | `{path}` |
@@ -92,7 +92,7 @@ Audit PDF quality and compliance.
 | `structure` | path | `{has_tags, headings, paragraphs, issues}` |
 | `accessibility` | path | `{score (0-100), issues}` |
 | `integrity` | path | `{intact, pages_readable, warnings}` |
-| `compare` | path_a, path_b | `{same_page_count, text_similarity, diffs}` |
+| `compare` | path (unused), path_a, path_b | `{same_page_count, text_similarity, diffs}` |
 
 ### pdf_rag
 
@@ -102,25 +102,27 @@ Build and query a RAG index over PDF content.
 |-----------|-----------|---------|
 | `chunk` | path, strategy (recursive/fixed), chunk_size (1000), overlap (200) | `{chunks, doc_id}` |
 | `index` | path, strategy, chunk_size, overlap | `{chunks_indexed, doc_id}` |
-| `search` | query, limit (10) | `{results: [{doc_id, chunk_id, text, _distance}]}` |
+| `search` | query, limit (10) | `{results: [{doc_id, chunk_id, page_num, text, _distance}]}` |
 | `list_documents` | (none) | `{documents: [{doc_id, chunk_count}]}` |
 | `delete_index` | doc_id | `{success}` |
+
+### Meta tools
+
+| Tool | Purpose |
+|------|---------|
+| `pdf_help` | List tools, or get input schema for one tool |
+| `pdf_status` | Server status, version, uptime, tool count, mode |
+| `pdf_shutdown` | Gracefully stop the server |
 
 ## Architecture
 
 ```
 pdf_mcp/
-├── server.py          FastMCP app + FastAPI REST + CORS
+├── server.py          FastMCP app + Starlette HTTP app + REST endpoints
 ├── config.py          Env-based configuration
 ├── models.py          Pydantic models + operation literals
-├── tools/             7 portmanteau tool files
-│   ├── extract.py
-│   ├── manipulate.py
-│   ├── annotate.py
-│   ├── forms.py
-│   ├── convert.py
-│   ├── validate.py
-│   └── rag.py
+├── tools/             8 tool modules (extract, manipulate, annotate, forms,
+│                      convert, validate, rag, meta)
 ├── services/          Core engines
 │   ├── extractor.py   PyMuPDF text/image/table/metadata extraction
 │   ├── manipulator.py pypdf merge/split/rotate/compress/encrypt
@@ -135,7 +137,7 @@ webapp/
 ├── src/
 │   ├── App.tsx        Router with 7 lazy-loaded pages
 │   ├── pages/         Dashboard, Workbench, Pipeline, Chat, Tools, Skills, Logs
-│   └── components/    AppLayout, Topbar, Sidebar, BackendDot, PdfViewer
+│   └── lib/           api.ts (fetch layer) + store.ts (Zustand incl. LLM state)
 ├── e2e/               Playwright tests
 ├── vite.config.ts     Vite config with proxy (/api, /mcp -> :11131)
 └── package.json
@@ -159,13 +161,13 @@ webapp/
 
 | Route | Page | Features |
 |-------|------|----------|
-| `/` | Dashboard | KPIs (health, tool count, uptime), recent PDFs, storage stats, exponential backoff health poll, data-testid attributes |
-| `/workbench` | Workbench | PDF.js viewer, tool palette sidebar (extract, annotate, convert), page navigation |
-| `/pipeline` | Pipeline | Upload PDF, select operation, configure params, run job, download result |
-| `/chat` | Chat | LLM chat with RAG context, personality selector, example prompts, export/clear |
-| `/tools` | Tools | Dynamic discovery via /api/tools, portmanteau drill-down, docstring rendering |
-| `/skills` | Skills | Load and render SKILL.md from /api/skills/{name} |
-| `/logs` | Logs | Real-time JSON-RPC log viewer |
+| `/` | Dashboard | KPIs (health, tool count, uptime), LLM availability banner, exponential backoff health poll |
+| `/workbench` | Workbench | PDF.js canvas viewer, tool palette, live job execution with result download |
+| `/pipeline` | Pipeline | Upload PDF, select operation, run job, job history |
+| `/chat` | Chat | LLM chat with skill-first system prompt, personality + provider/model select, export/clear |
+| `/tools` | Tools | Dynamic discovery via /api/tools, portmanteau drill-down, input schema rendering |
+| `/skills` | Skills | Load and render SKILL.md from /api/skills/{name} (XSS-safe) |
+| `/logs` | Logs | Real-time log viewer (ring buffer) |
 
 ## REST Endpoints
 
@@ -173,14 +175,20 @@ webapp/
 |----------|--------|-------------|
 | `/api/health` | GET | Server health, version, uptime, tool count |
 | `/api/v1/diagnostics` | GET | Tools list, system info, errors |
-| `/api/pdf/upload` | POST | Upload PDF (multipart) |
-| `/api/pdf/{job_id}/status` | GET | Job status and progress |
-| `/api/pdf/{job_id}/result` | GET | Download job result file |
-| `/api/skills` | GET | List available skills |
+| `/api/tools` | GET | Tool list with input schemas |
+| `/api/skills` | GET | Skill list |
 | `/api/skills/{name}` | GET | Raw SKILL.md content |
-| `/mcp` | SSE | MCP SSE transport (for webapp) |
+| `/api/llm/discover` | GET | Ollama / LM Studio detection |
+| `/api/chat` | POST | LLM chat completion |
+| `/api/pdf/upload` | POST | Upload PDF (multipart) |
+| `/api/pdf/files/{name}` | GET | Serve an uploaded file (for the viewer) |
+| `/api/jobs` | GET/POST | List / create batch jobs |
+| `/api/jobs/{job_id}` | GET | Job status and progress |
+| `/api/pdf/{job_id}/result` | GET | Download job result file |
+| `/api/logs` | GET | Ring-buffer log tail |
+| `/mcp` | POST | MCP streamable HTTP transport |
 
 ## Ports
 
 - Frontend: 11130 (Vite dev server)
-- Backend: 11131 (FastAPI + FastMCP HTTP)
+- Backend: 11131 (Starlette + FastMCP HTTP)

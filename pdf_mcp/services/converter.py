@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 import fitz
 from PIL import Image
@@ -11,7 +12,7 @@ class Converter:
             lines = []
             for i in range(len(doc)):
                 page = doc[i]
-                blocks = page.get_text("dict")["blocks"]
+                blocks = cast(dict[str, Any], page.get_text("dict"))["blocks"]
                 for b in blocks:
                     if b.get("type") != 0:
                         continue
@@ -61,7 +62,7 @@ class Converter:
             doc = fitz.open(pdf_path)
             parts = [f"<html><body><h1>{Path(pdf_path).stem}</h1>"]
             for i in range(len(doc)):
-                text = doc[i].get_text()
+                text = str(doc[i].get_text())
                 parts.append(f"<div class='page' id='page-{i + 1}'><h2>Page {i + 1}</h2><p>{text.replace(chr(10), '<br>')}</p></div>")
             parts.append("</body></html>")
             html = "\n".join(parts)

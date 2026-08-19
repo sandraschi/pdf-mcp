@@ -1,12 +1,18 @@
+import asyncio
 import logging
 import sys
 import time
-from contextlib import asynccontextmanager
+from collections import deque
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import cast
+from uuid import uuid4
 
 import uvicorn
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 
 from pdf_mcp.config import cfg
 
@@ -20,33 +26,253 @@ mcp = FastMCP(
     version=cfg.version,
 )
 
-# Import tools to register them
 
-# ── Lifespan ──
+# ── Log ring buffer (for /api/logs) ──
 
 
-@asynccontextmanager
-async def app_lifespan(app: FastMCP):
+class LogRingHandler(logging.Handler):
+    def __init__(self, capacity: int = 500):
+        super().__init__()
+        self.capacity = capacity
+        self.buffer: deque[dict] = deque(maxlen=capacity)
+        self.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            ts = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
+            self.buffer.append(
+                {
+                    "timestamp": ts,
+                    "level": record.levelname.lower(),
+                    "source": record.name,
+                    "message": self.format(record).split(" ", 3)[-1] if record.exc_info else record.getMessage(),
+                }
+            )
+        except Exception:
+            pass
+
+
+_log_ring = LogRingHandler()
+
+
+# ── Job store (in-memory batch executor) ──
+
+
+class JobStore:
+    def __init__(self) -> None:
+        self._jobs: dict[str, dict] = {}
+        self._uploads: dict[str, str] = {}
+
+    async def upload(self, filename: str, data: bytes) -> dict:
+        cfg.upload_dir.mkdir(parents=True, exist_ok=True)
+        safe = Path(filename).name
+        path = cfg.upload_dir / f"{uuid4().hex[:12]}_{safe}"
+        path.write_bytes(data)
+        self._uploads[safe] = str(path)
+        pages = self._count_pages(str(path))
+        return {"job_id": uuid4().hex[:12], "pages": pages, "size": len(data), "path": str(path)}
+
+    @staticmethod
+    def _count_pages(path: str) -> int:
+        try:
+            import fitz
+
+            doc = fitz.open(path)
+            try:
+                return len(doc)
+            finally:
+                doc.close()
+        except Exception:
+            return 0
+
+    def list_uploads(self) -> dict[str, str]:
+        return dict(self._uploads)
+
+    def create_job(self, operation: str, params: dict) -> str:
+        job_id = uuid4().hex[:12]
+        self._jobs[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "operation": operation,
+            "params": params,
+            "created": datetime.now(UTC).isoformat(),
+            "result_path": None,
+            "error": None,
+        }
+        return job_id
+
+    def get_job(self, job_id: str) -> dict | None:
+        return self._jobs.get(job_id)
+
+    def list_jobs(self) -> list[dict]:
+        return [
+            {
+                "job_id": j["job_id"],
+                "operation": j["operation"],
+                "status": j["status"],
+                "created": j["created"],
+            }
+            for j in self._jobs.values()
+        ]
+
+    def mark_running(self, job_id: str) -> None:
+        self._jobs[job_id]["status"] = "running"
+
+    def mark_done(self, job_id: str, result_path: str | None, error: str | None = None) -> None:
+        job = self._jobs[job_id]
+        job["status"] = "failed" if error else "completed"
+        job["result_path"] = result_path
+        job["error"] = error
+
+
+jobs = JobStore()
+
+
+# ── LLM discovery + chat ──
+
+_OLLAMA = "http://127.0.0.1:11434"
+_LM_STUDIO = "http://127.0.0.1:1234"
+
+_PERSONALITY_PROMPTS: dict[str, str] = {
+    "research-assistant": "You are a precise research assistant. Answer concisely and cite sources when possible.",
+    "expert-reviewer": "You are a critical expert reviewer. Evaluate claims rigorously and flag weaknesses.",
+    "quick-summarizer": "You are a quick summarizer. Return short, structured summaries.",
+    "technical-writer": "You are a technical writer. Produce clear, well-structured technical prose.",
+}
+
+
+async def _probe(url: str, path: str, timeout: float = 1.5) -> list[dict] | None:
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            r = await client.get(f"{url}{path}")
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            if "data" in data:
+                return data["data"]
+            if "models" in data:
+                return data["models"]
+            return None
+    except Exception:
+        return None
+
+
+async def _discover_providers() -> dict[str, dict]:
+    providers: dict[str, dict] = {}
+    ollama_models = await _probe(_OLLAMA, "/api/tags")
+    if ollama_models is not None:
+        providers["ollama"] = {
+            "name": "Ollama",
+            "base_url": _OLLAMA,
+            "available": True,
+            "models": [m.get("name", m.get("model", "")) for m in ollama_models if isinstance(m, dict)],
+        }
+    else:
+        providers["ollama"] = {"name": "Ollama", "base_url": _OLLAMA, "available": False, "models": []}
+    lm_models = await _probe(_LM_STUDIO, "/v1/models")
+    if lm_models is not None:
+        providers["lmstudio"] = {
+            "name": "LM Studio",
+            "base_url": _LM_STUDIO,
+            "available": True,
+            "models": [m.get("id", "") for m in lm_models if isinstance(m, dict)],
+        }
+    else:
+        providers["lmstudio"] = {"name": "LM Studio", "base_url": _LM_STUDIO, "available": False, "models": []}
+    return providers
+
+
+async def _chat_completion(messages: list[dict], provider: str, model: str) -> str:
+    import httpx
+
+    base = _OLLAMA if provider == "ollama" else _LM_STUDIO
+    url = f"{base}/v1/chat/completions"
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.post(
+            url,
+            json={"model": model, "messages": messages, "stream": False},
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data["choices"][0]["message"]["content"]
+
+
+# ── Operation → tool dispatch for the batch job executor ──
+
+
+async def _run_operation(operation: str, params: dict) -> dict:
+    """Dispatch a batch operation to the matching portmanteau tool."""
+    from pdf_mcp.tools.annotate import pdf_annotate
+    from pdf_mcp.tools.convert import pdf_convert
+    from pdf_mcp.tools.extract import pdf_extract
+    from pdf_mcp.tools.forms import pdf_forms
+    from pdf_mcp.tools.manipulate import pdf_manipulate
+    from pdf_mcp.tools.rag import pdf_rag
+    from pdf_mcp.tools.validate import pdf_validate
+
+    filename = params.get("filename") or params.get("path")
+    uploads = jobs.list_uploads()
+    path: str | None = uploads.get(str(filename)) if filename else None
+    path = path or (params.get("path") if isinstance(params.get("path"), str) else None)
+
+    def _fail(msg: str) -> dict:
+        return {"success": False, "error": msg}
+
+    if not path and operation not in ("merge", "search", "list_documents"):
+        return _fail("No source file found. Upload a PDF first (POST /api/pdf/upload).")
+
+    if operation in ("extract_text", "extract_images", "extract_tables"):
+        from pdf_mcp.models import PdfExtractOperation
+
+        return await pdf_extract(operation=cast(PdfExtractOperation, operation.removeprefix("extract_")), path=path or "")
+    if operation in ("compress", "rotate", "encrypt", "decrypt", "optimize", "delete_pages", "reorder"):
+        return await pdf_manipulate(
+            operation=operation,
+            path=path or "",
+            angle=int(params.get("angle", 90)),
+            password=params.get("password") or "",
+            new_order=params.get("new_order") or [],
+            page_list=params.get("page_list") or [],
+        )
+    if operation == "merge":
+        return await pdf_manipulate(operation="merge", path=path or "", paths=params.get("paths") or [])
+    if operation == "split":
+        return await pdf_manipulate(operation="split", path=path or "", output_dir=str(cfg.upload_dir / "split"))
+    if operation == "convert_markdown":
+        return await pdf_convert(operation="to_markdown", path=path or "")
+    if operation in ("watermark", "stamp", "highlight", "underline", "header_footer", "page_numbers"):
+        return await pdf_annotate(operation=operation, path=path or "", text=params.get("text"))
+    if operation in ("list_fields", "fill", "flatten", "export_data"):
+        return await pdf_forms(operation=operation, path=path or "", fields=params.get("fields"))
+    if operation in ("pdfa", "structure", "accessibility", "integrity", "compare"):
+        return await pdf_validate(operation=operation, path=path or "", path_a=params.get("path_a"), path_b=params.get("path_b"))
+    if operation in ("chunk", "index", "search", "list_documents", "delete_index"):
+        return await pdf_rag(operation=operation, path=path, query=params.get("query"), doc_id=params.get("doc_id"))
+    return {"success": False, "error": f"Unknown operation: {operation}"}
+
+
+async def _execute_job(job_id: str, operation: str, params: dict) -> None:
+    jobs.mark_running(job_id)
+    try:
+        result = await _run_operation(operation, params)
+        if result.get("success"):
+            result_path = result.get("path") or (result.get("files") or [None])[0]
+            jobs.mark_done(job_id, result_path)
+        else:
+            jobs.mark_done(job_id, None, result.get("error", "operation failed"))
+    except Exception as e:
+        logger.exception("job %s failed: %s", job_id, e)
+        jobs.mark_done(job_id, None, str(e))
+
+
+# ── HTTP app: FastMCP's Starlette app + webapp REST endpoints ──
+
+
+def create_http_app():
     cfg.ensure_dirs()
-    logger.info("pdf-mcp starting — uploads: %s, rag: %s", cfg.upload_dir, cfg.rag_store_path)
-    yield
-
-
-mcp._lifespan = app_lifespan
-
-
-# ── FastAPI app (for webapp REST endpoints + CORS) ──
-
-
-def create_http_app() -> FastAPI:
-    from contextlib import asynccontextmanager
-
-    @asynccontextmanager
-    async def http_lifespan(app: FastAPI):
-        cfg.ensure_dirs()
-        yield
-
-    app = FastAPI(title=cfg.server_name, version=cfg.version, lifespan=http_lifespan)
+    app = mcp.http_app()
 
     app.add_middleware(
         CORSMiddleware,
@@ -65,33 +291,183 @@ def create_http_app() -> FastAPI:
 
     _start_time = time.time()
 
-    @app.get("/api/health")
-    async def health():
-        tools = await mcp.list_tools()
-        tool_count = len(tools)
-        return {
-            "status": "ok",
-            "server": cfg.server_name,
-            "version": cfg.version,
-            "uptime_seconds": int(time.time() - _start_time),
-            "tool_count": tool_count,
-        }
+    def _tool_json(tool) -> dict:
+        schema = getattr(tool, "parameters", {}) or {}
+        return {"name": tool.name, "description": tool.description or "", "inputSchema": schema}
 
-    @app.get("/api/v1/diagnostics")
-    async def diagnostics():
+    async def health(request: Request) -> JSONResponse:
         tools = await mcp.list_tools()
-        tool_count = len(tools)
-        tools_list = [{"name": t.name} for t in tools]
-        return {
-            "status": "ok",
-            "server": cfg.server_name,
-            "version": cfg.version,
-            "uptime_seconds": int(time.time() - _start_time),
-            "tool_count": tool_count,
-            "tools": tools_list,
-            "system": {"windows": sys.platform == "win32"},
-            "errors": [],
-        }
+        return JSONResponse(
+            {
+                "status": "ok",
+                "server": cfg.server_name,
+                "version": cfg.version,
+                "uptime_seconds": int(time.time() - _start_time),
+                "tool_count": len(tools),
+            }
+        )
+
+    async def diagnostics(request: Request) -> JSONResponse:
+        tools = await mcp.list_tools()
+        return JSONResponse(
+            {
+                "status": "ok",
+                "server": cfg.server_name,
+                "version": cfg.version,
+                "uptime_seconds": int(time.time() - _start_time),
+                "tool_count": len(tools),
+                "tools": [{"name": t.name} for t in tools],
+                "system": {"windows": sys.platform == "win32"},
+                "errors": [],
+            }
+        )
+
+    async def list_tools(request: Request) -> JSONResponse:
+        tools = await mcp.list_tools()
+        return JSONResponse([_tool_json(t) for t in tools])
+
+    async def list_skills(request: Request) -> JSONResponse:
+        skills_dir = Path(__file__).resolve().parent / "skills"
+        skills = []
+        if skills_dir.exists():
+            for skill_dir in sorted(skills_dir.iterdir()):
+                if not skill_dir.is_dir():
+                    continue
+                md = skill_dir / "SKILL.md"
+                description = ""
+                if md.exists():
+                    content = md.read_text(encoding="utf-8")
+                    for line in content.splitlines():
+                        if line.startswith("description"):
+                            description = line.split(":", 1)[-1].strip()
+                            break
+                skills.append({"name": skill_dir.name, "description": description})
+        return JSONResponse(skills)
+
+    async def get_skill(request: Request) -> Response:
+        name = request.path_params.get("name", "")
+        skill_md = Path(__file__).resolve().parent / "skills" / name / "SKILL.md"
+        if not skill_md.exists():
+            return JSONResponse({"error": "Skill not found"}, status_code=404)
+        return PlainTextResponse(skill_md.read_text(encoding="utf-8"))
+
+    async def llm_discover(request: Request) -> JSONResponse:
+        providers = await _discover_providers()
+        return JSONResponse(
+            {
+                "providers": providers,
+                "default_provider": next((k for k, v in providers.items() if v["available"]), None),
+            }
+        )
+
+    async def chat(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"content": "Invalid JSON payload."}, status_code=400)
+        messages = payload.get("messages") or []
+        personality = payload.get("personality", "research-assistant")
+        provider = payload.get("provider")
+        model = payload.get("model")
+
+        providers = await _discover_providers()
+        if not provider:
+            provider = next((k for k, v in providers.items() if v["available"]), None)
+        if not provider or not providers.get(provider, {}).get("available"):
+            return JSONResponse(
+                {"content": ("No local LLM detected. Start Ollama (127.0.0.1:11434) or LM Studio (127.0.0.1:1234) to enable AI chat. The rest of the PDF tooling works without an LLM.")}
+            )
+        system_prompt = _PERSONALITY_PROMPTS.get(personality, _PERSONALITY_PROMPTS["research-assistant"])
+        if not model:
+            models = providers[provider].get("models") or []
+            model = models[0] if models else "llama3"
+        try:
+            content = await _chat_completion([{"role": "system", "content": system_prompt}, *messages], provider, model)
+            return JSONResponse({"content": content})
+        except Exception as e:
+            logger.exception("chat completion failed: %s", e)
+            return JSONResponse({"content": f"Chat failed: {e}"})
+
+    async def upload_pdf(request: Request) -> JSONResponse:
+        from starlette.datastructures import UploadFile as StarletteUploadFile
+
+        form = await request.form()
+        file = form.get("file")
+        if not isinstance(file, StarletteUploadFile):
+            return JSONResponse({"error": "file field required"}, status_code=400)
+        data = await file.read()
+        result = await jobs.upload(file.filename or "upload.pdf", data)
+        return JSONResponse({"job_id": result["job_id"], "pages": result["pages"], "size": result["size"]})
+
+    async def list_jobs(request: Request) -> JSONResponse:
+        return JSONResponse(jobs.list_jobs())
+
+    async def create_job(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON payload."}, status_code=400)
+        operation = payload.get("operation") or ""
+        params = payload.get("params") or {}
+        if not operation:
+            return JSONResponse({"error": "operation required"}, status_code=400)
+        job_id = jobs.create_job(operation, params)
+        asyncio.create_task(_execute_job(job_id, operation, params))
+        return JSONResponse({"job_id": job_id})
+
+    async def get_job(request: Request) -> JSONResponse:
+        job = jobs.get_job(request.path_params.get("job_id", ""))
+        if not job:
+            return JSONResponse({"error": "Job not found"}, status_code=404)
+        return JSONResponse(job)
+
+    async def job_result(request: Request) -> FileResponse | JSONResponse:
+        job = jobs.get_job(request.path_params.get("job_id", ""))
+        if not job:
+            return JSONResponse({"error": "Job not found"}, status_code=404)
+        if job["status"] != "completed" or not job["result_path"]:
+            return JSONResponse({"error": "Job not completed"}, status_code=409)
+        path = Path(job["result_path"])
+        if not path.exists():
+            return JSONResponse({"error": "Result file missing"}, status_code=404)
+        return FileResponse(path, filename=path.name)
+
+    async def get_logs(request: Request) -> JSONResponse:
+        query = request.query_params
+        level = query.get("level")
+        search = query.get("search")
+        try:
+            limit = int(query.get("limit", "100"))
+        except ValueError:
+            limit = 100
+        entries = list(_log_ring.buffer)
+        if level and level != "all":
+            entries = [e for e in entries if e["level"] == level]
+        if search:
+            entries = [e for e in entries if search.lower() in e["message"].lower()]
+        return JSONResponse(entries[-limit:])
+
+    async def get_uploaded_file(request: Request) -> FileResponse | JSONResponse:
+        name = request.path_params.get("name", "")
+        path = jobs.list_uploads().get(name)
+        if not path or not Path(path).exists():
+            return JSONResponse({"error": "File not found"}, status_code=404)
+        return FileResponse(path, filename=name)
+
+    app.add_route("/api/health", health)
+    app.add_route("/api/v1/diagnostics", diagnostics)
+    app.add_route("/api/tools", list_tools)
+    app.add_route("/api/skills", list_skills)
+    app.add_route("/api/skills/{name}", get_skill)
+    app.add_route("/api/llm/discover", llm_discover)
+    app.add_route("/api/chat", chat, methods=["POST"])
+    app.add_route("/api/pdf/upload", upload_pdf, methods=["POST"])
+    app.add_route("/api/pdf/files/{name}", get_uploaded_file)
+    app.add_route("/api/jobs", list_jobs)
+    app.add_route("/api/jobs", create_job, methods=["POST"])
+    app.add_route("/api/jobs/{job_id}", get_job)
+    app.add_route("/api/pdf/{job_id}/result", job_result)
+    app.add_route("/api/logs", get_logs)
 
     return app
 
@@ -101,6 +477,8 @@ def create_http_app() -> FastAPI:
 
 def main():
     import argparse
+
+    import pdf_mcp.tools  # noqa: F401 — imports all tool modules to register tools
 
     parser = argparse.ArgumentParser(description="pdf-mcp server")
     parser.add_argument("--mode", choices=["stdio", "http"], default=cfg.mode)
@@ -112,16 +490,17 @@ def main():
     cfg.host = args.host
     cfg.port = args.port
 
+    logging.basicConfig(level=logging.INFO)
+    logging.getLogger("pdf-mcp").addHandler(_log_ring)
+
     if args.mode == "http":
         http_app = create_http_app()
-        http_app.mount("/mcp", mcp.http_app())
 
-        logging.basicConfig(level=logging.INFO)
         logger.info("Starting HTTP server on %s:%s", args.host, args.port)
         uvicorn.run(http_app, host=args.host, port=args.port, log_level="info")
     else:
-        logging.basicConfig(level=logging.WARNING)
-        mcp.run_stdio_async()
+        logging.getLogger("pdf-mcp").setLevel(logging.INFO)
+        asyncio.run(mcp.run_stdio_async())
 
 
 if __name__ == "__main__":

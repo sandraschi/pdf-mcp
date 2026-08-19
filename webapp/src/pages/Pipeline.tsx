@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Play, Upload, FileText } from "lucide-react";
 import { fetchJobs, submitJob } from "@/lib/api";
+import { motion } from "framer-motion";
+import { FileText, Play, Upload } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 const operations = [
   { value: "extract_text", label: "Extract Text" },
@@ -22,18 +22,18 @@ export default function Pipeline() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     try {
       const j = await fetchJobs();
       setJobs(j);
     } catch {
       /* backend may not be ready */
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadJobs();
-  }, []);
+  }, [loadJobs]);
 
   const handleExecute = async () => {
     if (!file) return;
@@ -51,10 +51,14 @@ export default function Pipeline() {
 
   const statusColor = (s: string) => {
     switch (s) {
-      case "completed": return "text-green-400";
-      case "running": return "text-amber-400";
-      case "failed": return "text-red-400";
-      default: return "text-zinc-500";
+      case "completed":
+        return "text-green-400";
+      case "running":
+        return "text-amber-400";
+      case "failed":
+        return "text-red-400";
+      default:
+        return "text-zinc-500";
     }
   };
 
@@ -67,20 +71,15 @@ export default function Pipeline() {
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">PDF File</label>
+          <span className="block text-sm font-medium text-zinc-300 mb-2">PDF File</span>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 px-4 py-2.5 bg-zinc-800 rounded-lg cursor-pointer hover:bg-zinc-700 transition-colors text-zinc-300 text-sm">
               <Upload size={16} />
               {file ? file.name : "Choose file"}
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
+              <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             </label>
             {file && (
-              <button onClick={() => setFile(null)} className="text-xs text-zinc-500 hover:text-zinc-300">
+              <button type="button" onClick={() => setFile(null)} className="text-xs text-zinc-500 hover:text-zinc-300">
                 Clear
               </button>
             )}
@@ -88,20 +87,26 @@ export default function Pipeline() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">Operation</label>
+          <label htmlFor="operation-select" className="block text-sm font-medium text-zinc-300 mb-2">
+            Operation
+          </label>
           <select
+            id="operation-select"
             value={operation}
             onChange={(e) => setOperation(e.target.value)}
             className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-amber-500"
             data-testid="operation-select"
           >
             {operations.map((op) => (
-              <option key={op.value} value={op.value}>{op.label}</option>
+              <option key={op.value} value={op.value}>
+                {op.label}
+              </option>
             ))}
           </select>
         </div>
 
         <button
+          type="button"
           onClick={handleExecute}
           disabled={!file || running}
           className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-black rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors disabled:opacity-50"

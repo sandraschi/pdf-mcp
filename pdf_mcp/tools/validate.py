@@ -1,9 +1,10 @@
 import difflib
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 import fitz
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from pdf_mcp.models import PdfValidateOperation
@@ -15,7 +16,7 @@ logger = logging.getLogger("pdf-mcp")
 def _get_text(path: str) -> str:
     doc = fitz.open(path)
     try:
-        return "\n".join(page.get_text() for page in doc)
+        return "\n".join(str(page.get_text()) for page in doc)
     finally:
         doc.close()
 
@@ -28,13 +29,40 @@ def _page_count(path: str) -> int:
         doc.close()
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_validate(
     operation: PdfValidateOperation,
-    path: Annotated[str | None, Field(description="Path to the PDF file. Required except for compare.")] = None,
+    path: Annotated[str, Field(description="Path to the PDF file. Ignored for compare.")],
     path_a: Annotated[str | None, Field(description="First PDF path for compare operation.")] = None,
     path_b: Annotated[str | None, Field(description="Second PDF path for compare operation.")] = None,
 ) -> dict:
+    """Audit PDF quality and compliance.
+
+    PDF/A, structure, accessibility, integrity, and comparison checks.
+
+    ## Return Format
+
+    A dict with keys:
+    - success: bool - whether the operation succeeded
+    - message: str - human-readable summary
+    - operation-specific keys:
+      - pdfa: {is_pdfa, details}
+      - structure: {has_tags, headings, paragraphs, issues}
+      - accessibility: {score (0-100), issues}
+      - integrity: {intact, pages_readable, warnings}
+      - compare: {same_page_count, text_similarity, diffs}
+    On failure: {success: False, error, error_type}.
+
+    ## Examples
+
+    >>> await pdf_validate(operation="accessibility", path="report.pdf")
+    {"success": true, "score": 75, "issues": [...],
+     "message": "Accessibility score: 75/100 for report.pdf. 0 errors, 1 warnings."}
+
+    >>> await pdf_validate(operation="compare", path_a="a.pdf", path_b="b.pdf")
+    {"success": true, "same_page_count": true, "text_similarity": 0.98, "diffs": [],
+     "message": "Comparison: same page count, 98.0% text similarity between a.pdf and b.pdf."}
+    """
     try:
         if operation == "pdfa":
             doc = fitz.open(path)
@@ -77,8 +105,8 @@ async def pdf_validate(
                 issues = []
                 for i in range(len(doc)):
                     page = doc[i]
-                    text = page.get_text()
-                    blocks = page.get_text("blocks")
+                    text = str(page.get_text())
+                    blocks = cast(list[Any], page.get_text("blocks"))
                     for block in blocks:
                         block_text = block[4].strip() if len(block) > 4 else ""
                         if block_text and len(block_text) < 100 and any(c.isupper() for c in block_text[:20]) and block_text[-1] not in ".!?":
@@ -183,6 +211,8 @@ async def pdf_validate(
                 doc.close()
 
         elif operation == "compare":
+            if not path_a or not path_b:
+                return {"success": False, "error": "path_a and path_b are required for compare."}
             text_a = _get_text(path_a)
             text_b = _get_text(path_b)
             count_a = _page_count(path_a)

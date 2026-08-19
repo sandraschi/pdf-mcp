@@ -1,17 +1,7 @@
-import { NavLink } from "react-router-dom";
-import { motion } from "framer-motion";
-import {
-  LayoutDashboard,
-  FileText,
-  Workflow,
-  MessageSquare,
-  Wrench,
-  BookOpen,
-  Terminal,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
 import { useStore } from "@/lib/store";
+import { motion } from "framer-motion";
+import { BookOpen, ChevronLeft, ChevronRight, FileText, LayoutDashboard, MessageSquare, Terminal, Workflow, Wrench } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -40,6 +30,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="flex items-center justify-between px-4 h-14 border-b border-zinc-800">
         {!collapsed && <span className="font-bold text-amber-500 text-lg tracking-wide">pdf-mcp</span>}
         <button
+          type="button"
           onClick={onToggle}
           className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
           data-testid="sidebar-toggle"
@@ -55,9 +46,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             to={item.to}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                isActive
-                  ? "bg-amber-500/10 text-amber-500"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+                isActive ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
               }`
             }
             data-testid={`nav-${item.label.toLowerCase()}`}
@@ -76,9 +65,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           data-testid="backend-dot"
         />
         {!collapsed && (
-          <span className="text-xs text-zinc-500">
-            {backendOk === null ? "Connecting..." : backendOk ? "Connected" : "Offline"}
-          </span>
+          <span className="text-xs text-zinc-500">{backendOk === null ? "Connecting..." : backendOk ? "Connected" : "Offline"}</span>
         )}
       </div>
     </motion.aside>

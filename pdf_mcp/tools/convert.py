@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from pdf_mcp.config import cfg
@@ -30,7 +31,7 @@ def _out_path_no_input(op: str, ext: str = ".pdf") -> str:
     return str(cfg.upload_dir / f"output_{op}_{ts}_{uid}{ext}")
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
 async def pdf_convert(
     operation: PdfConvertOperation,
     path: Annotated[str | None, Field(description="Path to the PDF file. Required for to_* operations.")] = None,
@@ -42,8 +43,36 @@ async def pdf_convert(
     markdown: Annotated[str | None, Field(description="Markdown content for from_markdown operation.")] = None,
     paths: Annotated[list[str] | None, Field(description="Image paths for from_images operation.")] = None,
 ) -> dict:
+    """Convert between PDF and other formats.
+
+    PDF to/from Markdown, HTML, and images.
+
+    ## Return Format
+
+    A dict with keys:
+    - success: bool - whether the operation succeeded
+    - message: str - human-readable summary
+    - operation-specific keys:
+      - to_markdown: {markdown, pages}
+      - to_images: {images: [{page, path, width, height}]}
+      - to_html: {html}
+      - from_html/from_markdown/from_images: {path, pages}
+    On failure: {success: False, error, error_type}.
+
+    ## Examples
+
+    >>> await pdf_convert(operation="to_markdown", path="report.pdf")
+    {"success": true, "markdown": "# Report...", "pages": 3,
+     "message": "Converted report.pdf to markdown (3 pages)."}
+
+    >>> await pdf_convert(operation="from_markdown", markdown="# Hello")
+    {"success": true, "path": ".../output_from_markdown_....pdf", "pages": 1,
+     "message": "Created PDF from markdown (1 pages), saved to output_from_markdown_....pdf."}
+    """
     try:
         if operation == "to_markdown":
+            if not path:
+                return {"success": False, "error": "path is required for to_markdown."}
             result = converter.to_markdown(path)
             return {
                 "success": True,
@@ -53,6 +82,8 @@ async def pdf_convert(
             }
 
         elif operation == "to_images":
+            if not path:
+                return {"success": False, "error": "path is required for to_images."}
             img_dir = output_dir or str(cfg.upload_dir / f"{Path(path).stem}_images_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}")
             Path(img_dir).mkdir(parents=True, exist_ok=True)
             result = converter.to_images(path, output_dir=img_dir, fmt=fmt, dpi=dpi)
@@ -63,6 +94,8 @@ async def pdf_convert(
             }
 
         elif operation == "to_html":
+            if not path:
+                return {"success": False, "error": "path is required for to_html."}
             result = converter.to_html(path)
             return {"success": True, "html": result["html"], "message": f"Converted {Path(path).name} to HTML."}
 

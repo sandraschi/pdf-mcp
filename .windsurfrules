@@ -1,0 +1,18 @@
+# pdf-mcp Cursor Rules
+
+## Session Context (pdf-mcp)
+
+pdf-mcp is a PDF intelligence MCP server (FastMCP 3.4.4, FastAPI/Starlette HTTP on
+11131, React webapp on 11130). Before starting work: run `pdf_status` to confirm the
+server is alive and `pdf_help` to see the current tool surface. The 10 tools are
+pdf_extract, pdf_manipulate, pdf_annotate, pdf_forms, pdf_convert, pdf_validate,
+pdf_rag, pdf_help, pdf_status, pdf_shutdown. Each domain tool is a portmanteau with
+an `operation` param - read the docstring for operation names. At end of work: save
+any generated PDFs to data/uploads/ and note the job_id in the thread.
+
+## Standards
+
+- Check central docs first: `D:\Dev\repos\mcp-central-docs\` (standards/, patterns/)
+- Python: ruff (0.16.x) + pyright, all gates via `just ci`
+- Webapp: React + Vite + Tailwind + Zustand; `bun`, not npm
+- Never edit files in `_upstream/`; never commit `.env` or secrets

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from pdf_mcp.config import cfg
@@ -43,10 +44,10 @@ def _parse_page_range(s: str) -> list[int]:
     return sorted(pages)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
 async def pdf_manipulate(
     operation: PdfManipulateOperation,
-    path: Annotated[str | None, Field(description="Path to the PDF file. Required except for merge.")] = None,
+    path: Annotated[str, Field(description="Path to the PDF file. Ignored for merge.")],
     paths: Annotated[list[str] | None, Field(description="List of PDF paths to merge. Only for merge operation.")] = None,
     output_path: Annotated[str | None, Field(description="Output path. Auto-generated if omitted.")] = None,
     pages: Annotated[str | None, Field(description="Page range string (e.g. '1-5,7,9-12'). For rotate operation.")] = None,
@@ -58,6 +59,33 @@ async def pdf_manipulate(
     output_dir: Annotated[str | None, Field(description="Output directory for split operation.")] = None,
     ranges: Annotated[list[list[int]] | None, Field(description="Split ranges as list of [start, end] pairs (1-indexed).")] = None,
 ) -> dict:
+    """Modify PDF structure and properties.
+
+    Merge, split, rotate, reorder, delete pages, compress, encrypt/decrypt, and optimize PDFs.
+
+    ## Return Format
+
+    A dict with keys:
+    - success: bool - whether the operation succeeded
+    - message: str - human-readable summary
+    - operation-specific keys:
+      - merge: {path, pages}
+      - split: {files: [path, ...]}
+      - rotate/reorder/delete_pages/encrypt/decrypt: {path}
+      - compress: {path, original_size, compressed_size}
+      - optimize: {path, original_size, optimized_size}
+    On failure: {success: False, error, error_type}.
+
+    ## Examples
+
+    >>> await pdf_manipulate(operation="merge", path="a.pdf", paths=["a.pdf", "b.pdf"])
+    {"success": true, "path": ".../merged_....pdf", "pages": 4,
+     "message": "Merged 2 PDFs into merged_....pdf (4 pages)."}
+
+    >>> await pdf_manipulate(operation="rotate", path="report.pdf", angle=90)
+    {"success": true, "path": ".../report_rotate_....pdf",
+     "message": "Rotated report.pdf by 90 degrees, saved to report_rotate_....pdf."}
+    """
     try:
         if operation == "merge":
             result = manipulator.merge(paths or [], output_path or _merge_out_path(paths or [], "merge"))
@@ -68,7 +96,7 @@ async def pdf_manipulate(
                 "message": f"Merged {len(paths or [])} PDFs into {Path(result['path']).name} ({result['pages']} pages).",
             }
         elif operation == "split":
-            result = manipulator.split(path, output_dir=output_dir, ranges=ranges)
+            result = manipulator.split(path, output_dir=output_dir or str(cfg.upload_dir / "split"), ranges=ranges)
             return {
                 "success": True,
                 "files": result["files"],

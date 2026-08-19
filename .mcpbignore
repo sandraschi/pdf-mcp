@@ -1,0 +1,24 @@
+# MCPB pack exclusions (per MCPB_PACKAGING_STANDARDS.md 2.4)
+.venv/
+node_modules/
+webapp/
+native/
+tests/
+data/
+docs/
+reports/
+*.pyc
+__pycache__/
+*.bak
+*.bak.*
+.git/
+.github/
+*.pdf
+decrypted.pdf
+encrypted.pdf
+from_html.pdf
+from_img.pdf
+from_md.pdf
+merged.pdf
+optimized.pdf
+test_output.pdf

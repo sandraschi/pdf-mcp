@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import uuid4
 
 import fitz
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from pdf_mcp.config import cfg
@@ -29,13 +30,38 @@ def _get_widgets(page) -> list:
         return []
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
 async def pdf_forms(
     operation: PdfFormsOperation,
     path: Annotated[str, Field(description="Path to the PDF file.")],
     output_path: Annotated[str | None, Field(description="Output path. Auto-generated if omitted.")] = None,
     fields: Annotated[dict | None, Field(description="Dict of field_name: value for fill operation.")] = None,
 ) -> dict:
+    """Handle interactive form fields.
+
+    List, fill, flatten, and export PDF form fields.
+
+    ## Return Format
+
+    A dict with keys:
+    - success: bool - whether the operation succeeded
+    - message: str - human-readable summary
+    - operation-specific keys:
+      - list_fields: {fields: [{name, type, value, page, rect}]}
+      - fill/flatten: {path}
+      - export_data: {data: {field_name: value}}
+    On failure: {success: False, error, error_type}.
+
+    ## Examples
+
+    >>> await pdf_forms(operation="list_fields", path="form.pdf")
+    {"success": true, "fields": [{"name": "name", "type": "text", "value": "", "page": 0, "rect": [...]}],
+     "message": "Found 1 form fields in form.pdf."}
+
+    >>> await pdf_forms(operation="fill", path="form.pdf", fields={"name": "Ada"})
+    {"success": true, "path": ".../form_fill_....pdf",
+     "message": "Filled 1 form fields in form.pdf, saved to form_fill_....pdf."}
+    """
     try:
         if operation == "list_fields":
             doc = fitz.open(path)
@@ -70,7 +96,7 @@ async def pdf_forms(
                     page = doc[page_num]
                     for widget in _get_widgets(page):
                         name = widget.field_name
-                        if name in (fields or {}):
+                        if fields and name in fields:
                             widget.field_value = str(fields[name])
                             widget.update()
                             filled += 1

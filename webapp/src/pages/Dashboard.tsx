@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
-import { Server, Hash, Clock, Activity, FileText, Workflow, MessageSquare } from "lucide-react";
-import { useStore } from "@/lib/store";
 import BackendDot from "@/components/BackendDot";
+import { useStore } from "@/lib/store";
+import { motion } from "framer-motion";
+import { Activity, Clock, Cpu, FileText, Hash, MessageSquare, Server, Workflow } from "lucide-react";
 
 function formatUptime(s: number): string {
   const h = Math.floor(s / 3600);
@@ -36,6 +36,8 @@ export default function Dashboard() {
   const toolCount = useStore((s) => s.toolCount);
   const uptime = useStore((s) => s.uptime);
   const backendOk = useStore((s) => s.backendOk);
+  const llmAvailable = useStore((s) => s.llmAvailable);
+  const llmProbing = useStore((s) => s.llmProbing);
 
   return (
     <div className="max-w-5xl mx-auto space-y-8" data-testid="dashboard">
@@ -55,9 +57,28 @@ export default function Dashboard() {
       </div>
 
       {backendOk === false && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center" data-testid="backend-offline-banner">
           <p className="text-red-400 font-medium">Backend is offline</p>
           <p className="text-zinc-500 text-sm mt-1">Start the backend server to access all features</p>
+        </div>
+      )}
+
+      {backendOk === true && !llmProbing && !llmAvailable && (
+        <div
+          className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 flex items-start gap-4"
+          data-testid="llm-opportunity-banner"
+        >
+          <Cpu size={20} className="text-amber-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-amber-400 font-medium">No local LLM detected</p>
+            <p className="text-zinc-400 text-sm mt-1">
+              Start <span className="font-mono">ollama serve</span> or LM Studio to enable AI chat with RAG context. The PDF tooling works
+              without it.
+            </p>
+            <a href="/chat" className="inline-block mt-3 text-sm text-amber-400 hover:text-amber-300 underline">
+              Open Chat to set up a model
+            </a>
+          </div>
         </div>
       )}
 
@@ -90,4 +111,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

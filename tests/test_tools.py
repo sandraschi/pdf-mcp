@@ -27,7 +27,6 @@ def sample_pdf():
 
 
 class TestExtract:
-
     def test_extract_text(self, sample_pdf):
         ext = Extractor()
         result = ext.extract_text(sample_pdf)
@@ -46,12 +45,12 @@ class TestExtract:
 
 
 class TestManipulate:
-
     def test_manipulate_merge(self):
         paths = []
         for label in ["Doc A", "Doc B"]:
             f = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
             paths.append(f.name)
+            f.close()
             doc = fitz.open()
             page = doc.new_page()
             page.insert_text(fitz.Point(72, 72), label, fontsize=20)
@@ -81,7 +80,6 @@ class TestManipulate:
 
 
 class TestConvert:
-
     def test_convert_to_images(self, sample_pdf):
         conv = Converter()
         out_dir = tempfile.mkdtemp()
@@ -99,7 +97,6 @@ class TestConvert:
 
 
 class TestChunker:
-
     def test_chunker_recursive(self):
         chunker = Chunker()
         text = "Paragraph one.\n\nParagraph two.\n\nParagraph three."
@@ -126,7 +123,6 @@ class TestChunker:
 
 
 class TestRagStore:
-
     def test_rag_store_crud(self):
         db_dir = tempfile.mkdtemp()
         try:
@@ -158,4 +154,5 @@ class TestRagStore:
             assert len(ld2["documents"]) == 0
         finally:
             import shutil
+
             shutil.rmtree(db_dir, ignore_errors=True)

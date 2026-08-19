@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Any, cast
 
 import fitz
 from pypdf import PdfReader, PdfWriter
@@ -94,7 +95,7 @@ class Manipulator:
     def compress(self, pdf_path: str, output_path: str, quality: int = 85) -> dict:
         try:
             orig_size = os.path.getsize(pdf_path)
-            doc = fitz.open(pdf_path)
+            doc: fitz.Document = fitz.open(pdf_path)
             for i in range(len(doc)):
                 for img in doc[i].get_images(full=True):
                     xref = img[0]
@@ -103,7 +104,7 @@ class Manipulator:
                         pix = fitz.Pixmap(fitz.csRGB, pix)
                     if quality < 100:
                         fitz.Pixmap(fitz.csRGB, pix)
-                    doc.replace_image(xref, pixmap=pix)
+                    cast(Any, doc).replace_image(xref, pixmap=pix)
             doc.save(output_path, garbage=4, deflate=True)
             doc.close()
             new_size = os.path.getsize(output_path)

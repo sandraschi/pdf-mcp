@@ -1,8 +1,8 @@
-import { type ReactNode } from "react";
+import { useStore } from "@/lib/store";
 import { motion } from "framer-motion";
+import type { ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-import { useStore } from "@/lib/store";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const collapsed = useStore((s) => s.sidebarCollapsed);

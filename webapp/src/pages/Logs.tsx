@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
-import { Terminal, Search, RefreshCw } from "lucide-react";
 import { fetchLogs } from "@/lib/api";
+import { motion } from "framer-motion";
+import { RefreshCw, Search, Terminal } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 const levels = ["all", "info", "warn", "error", "debug"];
 
@@ -30,11 +30,16 @@ export default function Logs() {
 
   const levelColor = (lvl: string) => {
     switch (lvl) {
-      case "error": return "text-red-400";
-      case "warn": return "text-amber-400";
-      case "info": return "text-blue-400";
-      case "debug": return "text-zinc-500";
-      default: return "text-zinc-400";
+      case "error":
+        return "text-red-400";
+      case "warn":
+        return "text-amber-400";
+      case "info":
+        return "text-blue-400";
+      case "debug":
+        return "text-zinc-500";
+      default:
+        return "text-zinc-400";
     }
   };
 
@@ -46,6 +51,7 @@ export default function Logs() {
           <p className="text-sm text-zinc-500 mt-1">Server logs and events</p>
         </div>
         <button
+          type="button"
           onClick={load}
           disabled={loading}
           className="p-2 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
@@ -69,6 +75,7 @@ export default function Logs() {
         <div className="flex gap-1">
           {levels.map((l) => (
             <button
+              type="button"
               key={l}
               onClick={() => setLevel(l)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -96,7 +103,7 @@ export default function Logs() {
           ) : (
             logs.map((log, i) => (
               <motion.div
-                key={i}
+                key={`${log.timestamp}-${i}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="grid grid-cols-[140px_70px_1fr] gap-0 px-4 py-2 text-xs border-b border-zinc-800/30 hover:bg-zinc-800/30 transition-colors font-mono"

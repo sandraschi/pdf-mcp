@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import uuid4
 
 import fitz
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from pdf_mcp.config import cfg
@@ -24,7 +25,8 @@ def _out_path(path: str, op: str) -> str:
 
 def _hex_to_rgb(hex_color: str) -> tuple[float, float, float]:
     hex_color = hex_color.lstrip("#")
-    return tuple(int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    r, g, b = (int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    return (r, g, b)
 
 
 def _watermark_position(rect: fitz.Rect, position: str, text: str, font_size: int) -> list[tuple[float, float]]:
@@ -46,7 +48,7 @@ def _watermark_position(rect: fitz.Rect, position: str, text: str, font_size: in
     return [pos_map.get(position, (pw / 2 - tw / 2, ph / 2))]
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True))
 async def pdf_annotate(
     operation: PdfAnnotateOperation,
     path: Annotated[str, Field(description="Path to the PDF file.")],
@@ -65,14 +67,40 @@ async def pdf_annotate(
     font_size: Annotated[int, Field(description="Font size for header/footer/page numbers. Default 10.")] = 10,
     start: Annotated[int, Field(description="Starting page number. Default 1.")] = 1,
 ) -> dict:
+    """Add annotations and markup to PDFs.
+
+    Watermark, stamp, highlight, underline, header/footer, and page numbers.
+
+    ## Return Format
+
+    A dict with keys:
+    - success: bool - whether the operation succeeded
+    - message: str - human-readable summary
+    - operation-specific keys:
+      - watermark/stamp/header_footer/page_numbers: {path}
+      - highlight: {path, occurrences}
+      - underline: {path, occurrences}
+    On failure: {success: False, error, error_type}.
+
+    ## Examples
+
+    >>> await pdf_annotate(operation="watermark", path="report.pdf", text="CONFIDENTIAL", opacity=0.3)
+    {"success": true, "path": ".../report_watermark_....pdf",
+     "message": "Added watermark to report.pdf, saved to report_watermark_....pdf."}
+
+    >>> await pdf_annotate(operation="highlight", path="report.pdf", search_text="revenue")
+    {"success": true, "path": ".../report_highlight_....pdf", "occurrences": 3,
+     "message": "Highlighted 3 occurrences of 'revenue' in report.pdf."}
+    """
     try:
         op = output_path or _out_path(path, operation)
 
         if operation in ("watermark",):
-            doc = fitz.open(path)
+            doc: fitz.Document = fitz.open(path)
             try:
-                for i, page in enumerate(doc):
-                    rect = page.rect
+                for i in range(len(doc)):
+                    pg = doc[i]
+                    rect = pg.rect
                     if image_path:
                         img_rect = fitz.Rect(0, 0, rect.width * 0.3, rect.height * 0.3)
                         if position == "center":
@@ -88,11 +116,11 @@ async def pdf_annotate(
                             img_rect = img_rect + (0, rect.height - img_rect.height)
                         elif position == "bottom_right":
                             img_rect = img_rect + (rect.width - img_rect.width, rect.height - img_rect.height)
-                        page.insert_image(img_rect, filename=image_path, overlay=True, rotate=0)
+                        pg.insert_image(img_rect, filename=image_path, overlay=True, rotate=0)
                     elif text:
                         pts = _watermark_position(rect, position, text, 24)
                         for px, py in pts:
-                            annot = page.add_stamp_annot(fitz.Rect(px, py, px + 200, py + 30), stamp=0)
+                            annot = pg.add_stamp_annot(fitz.Rect(px, py, px + 200, py + 30), stamp=0)
                             annot.set_info(info=text)
                             annot.update(opacity=opacity)
                 doc.save(op, garbage=4, deflate=True)
@@ -185,9 +213,10 @@ async def pdf_annotate(
                 doc.close()
 
         elif operation == "page_numbers":
-            doc = fitz.open(path)
+            doc: fitz.Document = fitz.open(path)
             try:
-                for i, p in enumerate(doc):
+                for i in range(len(doc)):
+                    p = doc[i]
                     num = start + i
                     rect = p.rect
                     if position == "bottom_center":

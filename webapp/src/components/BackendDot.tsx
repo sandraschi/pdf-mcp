@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from "react";
 import { useStore } from "@/lib/store";
+import { useCallback, useEffect, useRef } from "react";
 
 const intervals = [1000, 2000, 4000, 8000, 16000];
 
@@ -36,9 +36,7 @@ export default function BackendDot() {
           backendOk === null ? "bg-zinc-500" : backendOk ? "bg-green-500 animate-pulse" : "bg-red-500"
         }`}
       />
-      <span className="text-xs text-zinc-500">
-        {backendOk === null ? "Connecting..." : backendOk ? "Connected" : "Offline"}
-      </span>
+      <span className="text-xs text-zinc-500">{backendOk === null ? "Connecting..." : backendOk ? "Connected" : "Offline"}</span>
     </div>
   );
 }

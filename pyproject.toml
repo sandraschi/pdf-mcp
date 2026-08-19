@@ -5,7 +5,7 @@ description = "Full-stack PDF intelligence MCP server — extract, manipulate, a
 authors = [{ name = "Sandra Schipal" }]
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp>=3.4",
+    "fastmcp>=3.4.4,<4",
     "fastapi",
     "uvicorn[standard]",
     "pymupdf",
@@ -22,7 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 rag = ["sentence-transformers"]
 test = ["pytest", "pytest-asyncio", "httpx"]
-dev = ["ruff>=0.16.0,<0.17"]
+dev = ["ruff>=0.16.0,<0.17", "pyright", "pre-commit"]
 
 [build-system]
 requires = ["hatchling"]

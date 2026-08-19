@@ -7,6 +7,7 @@ class RagStore:
     def __init__(self, db_path: str | Path):
         self._db = lancedb.connect(str(db_path))
         self._table_name = "pdf_chunks"
+        self._doc_counts: dict[str, int] = {}
         self._ensure_table()
 
     def _ensure_table(self):
@@ -47,6 +48,9 @@ class RagStore:
                     }
                 )
             self._table.add(data)
+            for chunk, vec in zip(chunks, embeddings):
+                doc_id = chunk.get("doc_id", "unknown")
+                self._doc_counts[doc_id] = self._doc_counts.get(doc_id, 0) + 1
             return {"success": True, "count": len(data)}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -73,24 +77,7 @@ class RagStore:
 
     def list_documents(self) -> dict:
         try:
-            df = self._table.to_lance().to_table().to_pandas()
-            if df.empty:
-                return {"success": True, "documents": []}
-            groups = (
-                df.groupby("doc_id")
-                .agg(
-                    chunk_count=("chunk_id", "count"),
-                )
-                .reset_index()
-            )
-            docs = []
-            for _, row in groups.iterrows():
-                docs.append(
-                    {
-                        "doc_id": row["doc_id"],
-                        "chunk_count": int(row["chunk_count"]),
-                    }
-                )
+            docs = [{"doc_id": doc_id, "chunk_count": count} for doc_id, count in sorted(self._doc_counts.items())]
             return {"success": True, "documents": docs}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -98,6 +85,7 @@ class RagStore:
     def delete_document(self, doc_id: str) -> dict:
         try:
             self._table.delete(f"doc_id = '{doc_id}'")
+            self._doc_counts.pop(doc_id, None)
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}

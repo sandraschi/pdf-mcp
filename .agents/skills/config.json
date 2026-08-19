@@ -1,0 +1,9 @@
+{
+  "skills": [
+    {
+      "name": "pdf-mcp-session",
+      "description": "Tool-awareness for pdf-mcp. Run pdf_status + pdf_help at session start; recall portmanteau operations; save outputs to data/uploads/.",
+      "auto_load": true
+    }
+  ]
+}

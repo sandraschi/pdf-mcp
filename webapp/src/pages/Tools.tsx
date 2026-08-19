@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Wrench, ChevronDown, ChevronRight } from "lucide-react";
 import { fetchTools } from "@/lib/api";
+import { motion } from "framer-motion";
+import { ChevronDown, ChevronRight, Wrench } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function Tools() {
   const [tools, setTools] = useState<Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchTools().then(setTools).catch(() => {});
+    fetchTools()
+      .then(setTools)
+      .catch(() => {});
   }, []);
 
   return (
@@ -24,7 +26,7 @@ export default function Tools() {
           <p className="text-sm">No tools discovered. Is the backend running?</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-testid="tools-list">
           {tools.map((tool) => {
             const isExpanded = expanded === tool.name;
             const schema = tool.inputSchema;
@@ -36,11 +38,13 @@ export default function Tools() {
             return (
               <motion.div
                 key={tool.name}
+                data-testid="tool-item"
                 className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
               >
                 <button
+                  type="button"
                   onClick={() => setExpanded(isExpanded ? null : tool.name)}
                   className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-800/50 transition-colors"
                 >
@@ -57,7 +61,7 @@ export default function Tools() {
                 </button>
 
                 {isExpanded && (
-                  <div className="px-5 pb-4 space-y-3 border-t border-zinc-800 pt-3">
+                  <div className="px-5 pb-4 space-y-3 border-t border-zinc-800 pt-3" data-testid="tool-details">
                     <p className="text-sm text-zinc-400">{tool.description}</p>
 
                     {subOps && subOps.length > 0 && (
@@ -65,7 +69,9 @@ export default function Tools() {
                         <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Sub-operations</p>
                         <div className="flex flex-wrap gap-2">
                           {subOps.map((op) => (
-                            <span key={op} className="px-2.5 py-1 bg-zinc-800 rounded text-xs text-zinc-300">{op}</span>
+                            <span key={op} className="px-2.5 py-1 bg-zinc-800 rounded text-xs text-zinc-300">
+                              {op}
+                            </span>
                           ))}
                         </div>
                       </div>

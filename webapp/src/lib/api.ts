@@ -1,5 +1,7 @@
 const API_BASE = "http://127.0.0.1:11131";
 
+export { API_BASE };
+
 export async function fetchHealth(): Promise<{ status: string; version: string; uptime_seconds: number; tool_count: number }> {
   const r = await fetch(`${API_BASE}/api/health`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -48,7 +50,9 @@ export async function fetchSkillContent(name: string): Promise<string> {
   return r.text();
 }
 
-export async function fetchLogs(params?: { level?: string; search?: string; limit?: number }): Promise<Array<{ timestamp: string; level: string; source: string; message: string }>> {
+export async function fetchLogs(params?: { level?: string; search?: string; limit?: number }): Promise<
+  Array<{ timestamp: string; level: string; source: string; message: string }>
+> {
   const q = new URLSearchParams();
   if (params?.level) q.set("level", params.level);
   if (params?.search) q.set("search", params.search);
@@ -58,12 +62,33 @@ export async function fetchLogs(params?: { level?: string; search?: string; limi
   return r.json();
 }
 
-export async function fetchChat(messages: Array<{ role: string; content: string }>, personality: string): Promise<{ content: string }> {
+export async function fetchChat(
+  messages: Array<{ role: string; content: string }>,
+  personality: string,
+  provider?: string,
+  model?: string,
+): Promise<{ content: string }> {
   const r = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, personality }),
+    body: JSON.stringify({ messages, personality, provider, model }),
   });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export interface LlmProviderInfo {
+  name: string;
+  base_url: string;
+  available: boolean;
+  models: string[];
+}
+
+export async function fetchLlmDiscover(): Promise<{
+  providers: Record<string, LlmProviderInfo>;
+  default_provider: string | null;
+}> {
+  const r = await fetch(`${API_BASE}/api/llm/discover`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
