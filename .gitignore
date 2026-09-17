@@ -28,3 +28,5 @@ mcpb/
 .ruff_cache/
 .pytest_cache/
 webapp/.vite/
+build/
+webapp/package-lock.json

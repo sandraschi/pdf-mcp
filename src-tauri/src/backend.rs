@@ -95,18 +95,71 @@ pub fn materialize_backend(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(bundled)
 }
 
-fn free_port(port: u16) {
+fn port_in_use(port: u16) -> bool {
     #[cfg(windows)]
     {
         let script = format!(
-            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue \
-            | ForEach-Object {{ taskkill /F /PID `$_.OwningProcess /T 2>$null }}"
+            "if (Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue) {{ exit 1 }} else {{ exit 0 }}"
         );
-        let _ = Command::new("powershell.exe")
+        let status = Command::new("powershell.exe")
             .args(["-NoProfile", "-Command", &script])
             .stdout(Stdio::null()).stderr(Stdio::null())
             .status();
-        thread::sleep(Duration::from_millis(500));
+        return !matches!(status, Ok(s) if s.success());
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = port;
+        false
+    }
+}
+
+fn free_port(port: u16) {
+    #[cfg(windows)]
+    {
+        // Layer 1: Stop-Process on owning PID(s)
+        let stop_script = format!(
+            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue \
+            | ForEach-Object {{ Stop-Process -Id `$_.OwningProcess -Force -ErrorAction SilentlyContinue }}"
+        );
+        let _ = Command::new("powershell.exe")
+            .args(["-NoProfile", "-Command", &stop_script])
+            .stdout(Stdio::null()).stderr(Stdio::null())
+            .status();
+        thread::sleep(Duration::from_millis(300));
+
+        // Layer 2: taskkill on owning PID(s)
+        if port_in_use(port) {
+            let taskkill_script = format!(
+                "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue \
+                | ForEach-Object {{ taskkill /F /PID `$_.OwningProcess /T 2>$null }}"
+            );
+            let _ = Command::new("powershell.exe")
+                .args(["-NoProfile", "-Command", &taskkill_script])
+                .stdout(Stdio::null()).stderr(Stdio::null())
+                .status();
+            thread::sleep(Duration::from_millis(300));
+        }
+
+        // Layer 3: UAC-elevated taskkill fallback for processes owned by another session
+        if port_in_use(port) {
+            let elevated_script = format!(
+                "Start-Process powershell -Verb RunAs -WindowStyle Hidden -ArgumentList \
+                '-NoProfile -Command \"Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | ForEach-Object {{ taskkill /F /PID $_.OwningProcess /T }}\"' -Wait"
+            );
+            let _ = Command::new("powershell.exe")
+                .args(["-NoProfile", "-Command", &elevated_script])
+                .stdout(Stdio::null()).stderr(Stdio::null())
+                .status();
+        }
+
+        // Layer 4: poll until the port is actually free (cap ~10s; caller retries spawn)
+        for _ in 0..20 {
+            if !port_in_use(port) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(500));
+        }
     }
 }
 
@@ -140,6 +193,11 @@ pub fn spawn_backend(app: AppHandle, state: &BackendProcess) -> Result<String, S
         .env(ENV_PORT, BACKEND_PORT.to_string())
         .env(ENV_HOST, "127.0.0.1")
         .env(ENV_TAURI, "1")
+        // pdf_mcp/config.py Config.mode defaults to "stdio" via MCP_MODE; the
+        // PyInstaller entry point (pdf_mcp/__main__.py) has none of run_server.py's
+        // PORT-implies-http argv translation, so without this the bundled backend
+        // silently starts in stdio mode and never binds BACKEND_PORT.
+        .env("MCP_MODE", "http")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -183,5 +241,3 @@ fn watch_backend_stream<R: std::io::Read + Send + 'static>(stream: R, app: AppHa
         }
     }
 }
-
-

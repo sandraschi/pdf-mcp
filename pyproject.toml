@@ -36,6 +36,11 @@ line-length = 200
 select = ["E", "F", "I", "N", "W", "UP", "T20"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# Vendored 1:1 from mcp-central-docs/templates/tauri-native/scripts/cua-smoke.py --
+# keep byte-identical to the template so future syncs stay a trivial diff.
+"scripts/*.py" = ["T20", "N806", "N818"]
+
 [tool.ruff.format]
 quote-style = "double"
 
@@ -45,7 +50,11 @@ asyncio_mode = "auto"
 
 [dependency-groups]
 dev = [
+    "altgraph>=0.17.5",
+    "pefile>=2024.8.26",
     "pillow>=12.3.0",
+    "pre-commit>=4.6.2",
+    "pyinstaller>=6.22.3",
     "pytesseract>=0.3.13",
     "pywinauto>=0.6.9",
 ]

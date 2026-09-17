@@ -44,7 +44,7 @@ a = Analysis(
     noarchive=True,
 )
 # Strip .dist-info but preserve metadata for packages that need it at runtime
-_keep_dist = ["fastmcp-", "fastmcp_slim-", "mcp-", "prefab_ui-", "opentelemetry-", "email_validator-"]
+_keep_dist = ["fastmcp-", "fastmcp_slim-", "mcp-", "prefab_ui-", "opentelemetry-", "email_validator-", "lancedb-", "pyarrow-"]
 _saved = [
     e
     for e in a.datas
@@ -58,8 +58,6 @@ SKIP = [
     "playwright",
     "bitsandbytes",
     "llvmlite",
-    "pyarrow",
-    "pymupdf",
     "grpc",
     "numba",
     "Cython",
@@ -68,13 +66,28 @@ SKIP = [
     "boto3",
     "botocore",
     "matplotlib",
-    "PIL",
     "pandas",
     "scipy",
     "sklearn",
     "onnxruntime",
 ]
-a.binaries = [b for b in a.binaries if not any(s in b[0].lower() for s in SKIP)]
+# Path-segment match, not raw substring: a raw "s in path" check false-positived on
+# numpy's bundled OpenBLAS DLL (numpy.libs/libscipy_openblas64_-<hash>.dll), which
+# contains the substring "scipy" in its filename despite belonging to numpy, not
+# scipy. Require the skip name to be a whole path token (dir or file-stem boundary).
+import re as _re
+
+
+def _is_skipped_binary(path: str) -> bool:
+    tokens = _re.split(r"[\\/]", path.lower())
+    for skip in SKIP:
+        for tok in tokens:
+            if tok == skip or tok.startswith(skip + ".") or tok.startswith(skip + "-") or tok.startswith(skip + "_"):
+                return True
+    return False
+
+
+a.binaries = [b for b in a.binaries if not _is_skipped_binary(b[0])]
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,

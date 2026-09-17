@@ -1,0 +1,23 @@
+{
+  "product_name": "Pdf MCP",
+  "install_dir": "%LOCALAPPDATA%\\Pdf MCP",
+  "operator_exe": "pdf-mcp-native.exe",
+  "backend_process_names": ["pdf-mcp-native", "pdf-mcp-backend"],
+  "backend_port": 11131,
+  "health_path": "/api/health",
+  "diagnostics_path": "/api/v1/diagnostics",
+  "feature_smoke_path": "/api/stats",
+  "window_title_re": "Pdf MCP",
+  "nsis_glob": "src-tauri/target/release/bundle/nsis/Pdf MCP_*_x64-setup.exe",
+  "bridge_ok_text": "pdf-mcp",
+  "uninstall_registry_filter": "*Pdf MCP*",
+  "nav_routes": [
+    ["Dashboard", "Dashboard"],
+    ["Workbench", "Workbench"],
+    ["Pipeline", "Pipeline"],
+    ["Chat", "Chat"],
+    ["Tools", "Tools"],
+    ["Skills", "Skills"],
+    ["Logs", "Logs"]
+  ]
+}
