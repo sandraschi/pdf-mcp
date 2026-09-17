@@ -3,6 +3,7 @@
 node_modules/
 webapp/
 native/
+src-tauri/
 tests/
 data/
 docs/
@@ -13,6 +14,7 @@ __pycache__/
 *.bak.*
 .git/
 .github/
+glama.json
 *.pdf
 decrypted.pdf
 encrypted.pdf

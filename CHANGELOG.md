@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased (2026-09-17)
+
+- **assfix pass** (score 92 -> 80 drift found, both HIGH items fixed, back to 80+ clean gates):
+  - `.gitignore`/`.mcpbignore`: added `src-tauri/target/`, `src-tauri/resources/*.exe`,
+    `src-tauri/gen/`, `cua-reports/` — the Tauri retrofit added `src-tauri/` but the
+    ignore files only covered the older `native/` naming, leaving Rust build output
+    and packaged `.exe` binaries unprotected from an accidental commit.
+  - `pyproject.toml`: added `T20` (print-ban) to `[tool.ruff.lint] select` — was
+    missing so the print-in-server-code rule was never actually enforced (no
+    violations found on this repo, but the guard rail was silently disabled).
+  - `run_server.py`: `ruff format` whitespace fix (pre-existing gate failure).
+  - See `reports/assess-2026-09-17.md` for the full assessment.
+
 ## 0.2.1 (2026-08-19)
 
 - **FastMCP skills + prompts + resources + sampling** (closes remaining MEDIUMs M3-M6):

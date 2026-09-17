@@ -1,4 +1,5 @@
 """PyInstaller entry point — dual transport (stdio or HTTP)."""
+
 import os
 import sys
 

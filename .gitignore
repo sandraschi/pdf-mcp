@@ -14,6 +14,10 @@ webapp/.tsbuildinfo
 native/target/
 native/resources/*.exe
 native/binaries/*.exe
+src-tauri/target/
+src-tauri/resources/*.exe
+src-tauri/gen/
+cua-reports/
 *.pdf
 !docs/**/*.pdf
 !webapp/public/**/*.pdf
