@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { type LlmProviderInfo, fetchHealth, fetchLlmDiscover } from "./api";
+import { type Capabilities, type LlmProviderInfo, fetchCapabilities, fetchHealth, fetchLlmDiscover } from "./api";
 
 const LLM_PROVIDER_KEY = "llm_provider";
 const LLM_MODEL_KEY = "llm_model";
@@ -29,6 +29,9 @@ interface AppState {
   setLlmProvider: (p: string) => void;
   setLlmModel: (m: string) => void;
   discoverLlm: () => Promise<void>;
+
+  capabilities: Capabilities | null;
+  loadCapabilities: () => Promise<void>;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -83,6 +86,15 @@ export const useStore = create<AppState>((set) => ({
       set({ providers: d.providers, llmAvailable: available, llmProvider: provider, llmModel: model, llmProbing: false });
     } catch {
       set({ llmProbing: false });
+    }
+  },
+
+  capabilities: null,
+  loadCapabilities: async () => {
+    try {
+      set({ capabilities: await fetchCapabilities() });
+    } catch {
+      /* backend not ready; leave null */
     }
   },
 }));

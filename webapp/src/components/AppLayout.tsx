@@ -13,16 +13,18 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const setCollapsed = useStore((s) => s.setSidebarCollapsed);
   const healthCheck = useStore((s) => s.healthCheck);
   const discoverLlm = useStore((s) => s.discoverLlm);
+  const loadCapabilities = useStore((s) => s.loadCapabilities);
   const navigate = useNavigate();
   const { zoom } = useZoom();
   useBackendStatus();
 
-  // Global bootstrap: poll backend health and probe for a local LLM on every
-  // route, so the status dot and Dashboard LLM banner are never stale.
+  // Global bootstrap: poll backend health, probe for a local LLM, and load the
+  // capability introspection payload (WEBAPP_STANDARDS 1.4) on every route.
   useEffect(() => {
     healthCheck();
     discoverLlm();
-  }, [healthCheck, discoverLlm]);
+    loadCapabilities();
+  }, [healthCheck, discoverLlm, loadCapabilities]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

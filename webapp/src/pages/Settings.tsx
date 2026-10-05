@@ -23,6 +23,7 @@ export default function Settings() {
 
   const [onboarding, setOnboarding] = useState<Onboarding | null>(null);
   const [testing, setTesting] = useState<string | null>(null);
+  const capabilities = useStore((s) => s.capabilities);
 
   useEffect(() => {
     discoverLlm();
@@ -147,6 +148,50 @@ export default function Settings() {
         ) : (
           <p className="text-sm text-zinc-300" data-testid="llm-settings-empty">
             No local LLM running. Start Ollama or LM Studio and use “Test connection”.
+          </p>
+        )}
+      </section>
+
+      <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6" data-testid="capabilities-panel">
+        <div className="flex items-center gap-2 mb-3">
+          <SettingsIcon size={16} className="text-amber-500" />
+          <h3 className="text-lg font-semibold text-zinc-100">Capabilities</h3>
+        </div>
+        {capabilities ? (
+          <div className="space-y-3 text-sm">
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["sampling", capabilities.features.sampling],
+                  ["agentic_workflows", capabilities.features.agentic_workflows],
+                  ["prompts", capabilities.features.prompts],
+                  ["resources", capabilities.features.resources],
+                  ["skills", capabilities.features.skills],
+                ] as const
+              ).map(([name, on]) => (
+                <span
+                  key={name}
+                  className={`px-2.5 py-1 rounded-lg font-mono ${on ? "bg-green-500/15 text-green-400" : "bg-zinc-800 text-zinc-300"}`}
+                  data-testid={`cap-${name}`}
+                >
+                  {name}: {on ? "on" : "off"}
+                </span>
+              ))}
+            </div>
+            <p className="text-zinc-300">
+              Tools: <span className="font-mono text-zinc-100">{capabilities.tool_surface.total}</span> (
+              {capabilities.tool_surface.portmanteau_count} portmanteau, {capabilities.tool_surface.atomic_count} atomic) · Prompts:{" "}
+              {capabilities.inventory.prompt_names.length} · Resources: {capabilities.inventory.resource_uris.length} · Skills:{" "}
+              {capabilities.inventory.skill_uris.length}
+            </p>
+            <p className="text-zinc-300">
+              Transport: <span className="font-mono text-zinc-100">{capabilities.runtime.transport}</span> · Surface:{" "}
+              <span className="font-mono text-zinc-100">{capabilities.runtime.surface_mode}</span> · FastMCP {capabilities.server.fastmcp}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-300" data-testid="capabilities-empty">
+            Capabilities unavailable — is the backend running?
           </p>
         )}
       </section>

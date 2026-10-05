@@ -520,24 +520,48 @@ def create_http_app():
 
     async def capabilities(request: Request) -> JSONResponse:
         tools = await mcp.list_tools()
+        portmanteau: list[str] = []
+        atomic: list[str] = []
+        for t in tools:
+            schema = getattr(t, "parameters", {}) or {}
+            props = schema.get("properties", {}) if isinstance(schema, dict) else {}
+            (portmanteau if "operation" in props else atomic).append(t.name)
         try:
-            prompts = [p.name for p in await mcp.list_prompts()]
+            prompt_names = [p.name for p in await mcp.list_prompts()]
         except Exception:
-            prompts = []
+            prompt_names = []
         try:
-            resources = [str(r.uri) for r in await mcp.list_resources()]
+            resource_uris = [str(r.uri) for r in await mcp.list_resources()]
         except Exception:
-            resources = []
+            resource_uris = []
+        skills_dir = Path(__file__).resolve().parent / "skills"
+        skill_uris = [f"skill://{d.name}/SKILL.md" for d in sorted(skills_dir.iterdir()) if d.is_dir()] if skills_dir.exists() else []
         return JSONResponse(
             {
-                "server": cfg.server_name,
-                "version": cfg.version,
-                "tool_count": len(tools),
-                "tools": [t.name for t in tools],
-                "prompts": prompts,
-                "resources": resources,
-                "features": {"rag": True, "llm": True, "webhooks": True, "transport": ["stdio", "http"]},
-                "ports": {"backend": cfg.port, "frontend": cfg.frontend_port},
+                "status": "ok",
+                "server": {"name": cfg.server_name, "version": cfg.version, "fastmcp": "3.4+"},
+                "tool_surface": {
+                    "total": len(tools),
+                    "portmanteau_count": len(portmanteau),
+                    "atomic_count": len(atomic),
+                    "portmanteau_tools": portmanteau,
+                    "atomic_tools": atomic,
+                },
+                "features": {
+                    "sampling": True,
+                    "agentic_workflows": True,
+                    "prompts": bool(prompt_names),
+                    "resources": bool(resource_uris),
+                    "skills": bool(skill_uris),
+                },
+                "inventory": {
+                    "workflow_tools": ["pdf_do"],
+                    "prompt_names": prompt_names,
+                    "resource_uris": resource_uris,
+                    "skill_uris": skill_uris,
+                },
+                "runtime": {"transport": "dual", "surface_mode": "both"},
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
 

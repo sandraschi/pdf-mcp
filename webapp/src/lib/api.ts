@@ -241,3 +241,25 @@ export async function fetchFleetApps(): Promise<{
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
+
+export interface Capabilities {
+  status: string;
+  server: { name: string; version: string; fastmcp: string };
+  tool_surface: {
+    total: number;
+    portmanteau_count: number;
+    atomic_count: number;
+    portmanteau_tools: string[];
+    atomic_tools: string[];
+  };
+  features: { sampling: boolean; agentic_workflows: boolean; prompts: boolean; resources: boolean; skills: boolean };
+  inventory: { workflow_tools: string[]; prompt_names: string[]; resource_uris: string[]; skill_uris: string[] };
+  runtime: { transport: string; surface_mode: string };
+  timestamp: string;
+}
+
+export async function fetchCapabilities(): Promise<Capabilities> {
+  const r = await fetch(`${API_BASE}/api/capabilities`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
