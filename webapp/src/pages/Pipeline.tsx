@@ -1,7 +1,9 @@
 import { API_BASE, createShare, fetchJobs, fetchRecipes, submitJob } from "@/lib/api";
 import { motion } from "framer-motion";
 import { FileText, Link2, Play, Upload } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+const PAGE_SIZE = 10;
 
 const operations = [
   { value: "extract_text", label: "Extract Text" },
@@ -24,6 +26,11 @@ export default function Pipeline() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [jobSearch, setJobSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortKey, setSortKey] = useState<"created" | "status" | "operation">("created");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
 
   const loadJobs = useCallback(async () => {
     try {
@@ -99,7 +106,34 @@ export default function Pipeline() {
       case "failed":
         return "text-red-400";
       default:
-        return "text-zinc-500";
+        return "text-zinc-300";
+    }
+  };
+
+  const filteredJobs = useMemo(() => {
+    const q = jobSearch.trim().toLowerCase();
+    const list = jobs.filter((j) => {
+      if (statusFilter !== "all" && j.status !== statusFilter) return false;
+      if (!q) return true;
+      return j.job_id.toLowerCase().includes(q) || j.operation.toLowerCase().includes(q);
+    });
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      return av < bv ? -dir : av > bv ? dir : 0;
+    });
+  }, [jobs, jobSearch, statusFilter, sortKey, sortDir]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredJobs.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageJobs = filteredJobs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const toggleSort = (key: "created" | "status" | "operation") => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
     }
   };
 
@@ -107,7 +141,7 @@ export default function Pipeline() {
     <div className="max-w-4xl mx-auto space-y-6" data-testid="pipeline">
       <div>
         <h2 className="text-2xl font-bold text-zinc-100">Pipeline</h2>
-        <p className="text-sm text-zinc-500 mt-1">Batch PDF operations</p>
+        <p className="text-sm text-zinc-300 mt-1">Batch PDF operations</p>
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
@@ -120,7 +154,7 @@ export default function Pipeline() {
               <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             </label>
             {file && (
-              <button type="button" onClick={() => setFile(null)} className="text-xs text-zinc-500 hover:text-zinc-300">
+              <button type="button" onClick={() => setFile(null)} className="text-sm text-zinc-300 hover:text-zinc-300">
                 Clear
               </button>
             )}
@@ -193,7 +227,7 @@ export default function Pipeline() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-sm text-zinc-400 bg-zinc-800/50 rounded-lg p-3 space-y-1"
+            className="text-sm text-zinc-300 bg-zinc-800/50 rounded-lg p-3 space-y-1"
           >
             <p>{result}</p>
             {shareUrl && (
@@ -201,7 +235,7 @@ export default function Pipeline() {
                 href={shareUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-amber-400 hover:text-amber-300 text-xs break-all"
+                className="text-amber-400 hover:text-amber-300 text-sm break-all"
                 data-testid="share-link"
               >
                 {shareUrl}
@@ -211,42 +245,82 @@ export default function Pipeline() {
         )}
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-zinc-800">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden" data-testid="job-history">
+        <div className="px-5 py-3 border-b border-zinc-800 flex flex-wrap items-center gap-3">
           <h3 className="text-sm font-semibold text-zinc-100">Job History</h3>
+          <span className="text-sm text-zinc-300">
+            {filteredJobs.length} of {jobs.length}
+          </span>
+          <input
+            value={jobSearch}
+            onChange={(e) => {
+              setJobSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search jobs..."
+            className="ml-auto bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+            data-testid="job-search"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-amber-500"
+            data-testid="job-status-filter"
+          >
+            <option value="all">All statuses</option>
+            <option value="completed">Completed</option>
+            <option value="running">Running</option>
+            <option value="queued">Queued</option>
+            <option value="failed">Failed</option>
+          </select>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wider">
+              <tr className="border-b border-zinc-800 text-zinc-300 text-sm uppercase tracking-wider">
+                <th className="text-left px-5 py-3 font-medium">
+                  <button type="button" onClick={() => toggleSort("operation")} className="hover:text-zinc-100">
+                    Operation {sortKey === "operation" ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                  </button>
+                </th>
                 <th className="text-left px-5 py-3 font-medium">Job ID</th>
-                <th className="text-left px-5 py-3 font-medium">Operation</th>
-                <th className="text-left px-5 py-3 font-medium">Status</th>
-                <th className="text-left px-5 py-3 font-medium">Created</th>
+                <th className="text-left px-5 py-3 font-medium">
+                  <button type="button" onClick={() => toggleSort("status")} className="hover:text-zinc-100">
+                    Status {sortKey === "status" ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                  </button>
+                </th>
+                <th className="text-left px-5 py-3 font-medium">
+                  <button type="button" onClick={() => toggleSort("created")} className="hover:text-zinc-100">
+                    Created {sortKey === "created" ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                  </button>
+                </th>
                 <th className="text-left px-5 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {jobs.length === 0 ? (
+              {pageJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-zinc-600">
+                  <td colSpan={5} className="px-5 py-8 text-center text-zinc-300" data-testid="job-empty">
                     <FileText size={24} className="mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No jobs yet</p>
+                    <p className="text-sm">{jobs.length === 0 ? "No jobs yet" : "No jobs match the filter"}</p>
                   </td>
                 </tr>
               ) : (
-                jobs.map((job) => (
+                pageJobs.map((job) => (
                   <tr key={job.job_id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-5 py-3 text-zinc-300 font-mono text-xs">{job.job_id}</td>
+                    <td className="px-5 py-3 text-zinc-300 font-mono text-sm">{job.job_id}</td>
                     <td className="px-5 py-3 text-zinc-300">{job.operation}</td>
                     <td className={`px-5 py-3 font-medium ${statusColor(job.status)}`}>{job.status}</td>
-                    <td className="px-5 py-3 text-zinc-500 text-xs">{job.created}</td>
+                    <td className="px-5 py-3 text-zinc-300 text-sm">{job.created}</td>
                     <td className="px-5 py-3">
                       {job.status === "completed" && (
                         <button
                           type="button"
                           onClick={() => handleShare(job.job_id)}
-                          className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
+                          className="flex items-center gap-1 text-sm text-amber-400 hover:text-amber-300"
                           data-testid="share-btn"
                         >
                           <Link2 size={12} /> Share
@@ -259,6 +333,31 @@ export default function Pipeline() {
             </tbody>
           </table>
         </div>
+        {pageCount > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-zinc-800" data-testid="job-pagination">
+            <span className="text-sm text-zinc-300">
+              Page {currentPage} of {pageCount}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1 bg-zinc-800 rounded-lg text-sm text-zinc-200 disabled:opacity-40 hover:bg-zinc-700"
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                disabled={currentPage >= pageCount}
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                className="px-3 py-1 bg-zinc-800 rounded-lg text-sm text-zinc-200 disabled:opacity-40 hover:bg-zinc-700"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

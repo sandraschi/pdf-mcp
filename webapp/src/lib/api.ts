@@ -183,3 +183,51 @@ export async function fetchRecipes(): Promise<Array<{ name: string; steps: strin
   const data = await r.json();
   return data.recipes || [];
 }
+
+export async function fetchLlmProviders(): Promise<{
+  providers: Record<string, { name: string; base_url: string; available: boolean; configured: boolean; models: string[] }>;
+}> {
+  const r = await fetch(`${API_BASE}/api/llm/providers`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function fetchLlmModels(provider: string): Promise<{ provider: string; models: string[] }> {
+  const r = await fetch(`${API_BASE}/api/llm/models?provider=${encodeURIComponent(provider)}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function fetchLlmOnboarding(): Promise<{
+  llm_required: boolean;
+  llm_detected: boolean;
+  recommended_provider: string;
+  steps: string[];
+}> {
+  const r = await fetch(`${API_BASE}/api/llm/onboarding`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function fetchWatchStatus(): Promise<{
+  watching: boolean;
+  processed: Array<{ file: string; job_id: string; at: string }>;
+  errors: unknown[];
+}> {
+  const r = await fetch(`${API_BASE}/api/watch/status`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function fetchDiagnostics(): Promise<{
+  status: string;
+  version: string;
+  uptime_seconds: number;
+  tool_count: number;
+  system: Record<string, unknown>;
+  errors: unknown[];
+}> {
+  const r = await fetch(`${API_BASE}/api/v1/diagnostics`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
