@@ -199,8 +199,8 @@ export default function Chat() {
         </div>
         <div className="flex items-center gap-2" data-testid="chat-controls">
           <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-800" data-testid="llm-status">
-            <Cpu size={14} className={llmAvailable ? "text-green-400" : llmProbing ? "text-amber-400 animate-pulse" : "text-zinc-600"} />
-            <span className={`text-xs ${llmAvailable ? "text-green-400" : "text-zinc-500"}`}>
+            <Cpu size={14} className={llmAvailable ? "text-green-400" : llmProbing ? "text-amber-400 animate-pulse" : "text-zinc-300"} />
+            <span className={`text-sm ${llmAvailable ? "text-green-400" : "text-zinc-300"}`}>
               {llmProbing ? "probing..." : llmAvailable ? (llmProvider === "ollama" ? "Ollama" : "LM Studio") : "no LLM"}
             </span>
           </div>
@@ -250,7 +250,7 @@ export default function Chat() {
             type="button"
             onClick={handleExport}
             disabled={messages.length === 0}
-            className="p-2 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors disabled:opacity-30"
+            className="p-2 rounded-lg text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors disabled:opacity-30"
             data-testid="chat-export"
             title="Export chat"
           >
@@ -260,7 +260,7 @@ export default function Chat() {
             type="button"
             onClick={handleClear}
             disabled={messages.length === 0}
-            className="p-2 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors disabled:opacity-30"
+            className="p-2 rounded-lg text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors disabled:opacity-30"
             data-testid="chat-clear"
             title="Clear chat"
           >
@@ -274,7 +274,7 @@ export default function Chat() {
           <button
             type="button"
             onClick={() => setSearchOpen((o) => !o)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 text-sm text-zinc-300 hover:bg-zinc-700 transition-colors"
             title="Toggle PDF search"
           >
             <Search size={13} />
@@ -297,7 +297,7 @@ export default function Chat() {
                 type="button"
                 onClick={runSearch}
                 disabled={searching || !searchQuery.trim()}
-                className="px-3 py-1.5 bg-amber-500 text-black rounded-lg text-xs font-medium hover:bg-amber-400 disabled:opacity-40"
+                className="px-3 py-1.5 bg-amber-500 text-black rounded-lg text-sm font-medium hover:bg-amber-400 disabled:opacity-40"
                 data-testid="rag-search-btn"
               >
                 {searching ? "..." : "Go"}
@@ -308,21 +308,21 @@ export default function Chat() {
 
         {searchOpen && searchHits.length > 0 && (
           <div className="px-3 py-2 border-b border-zinc-800 max-h-48 overflow-y-auto space-y-2" data-testid="rag-sources">
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Sources</p>
+            <p className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Sources</p>
             {searchHits.map((hit, i) => (
               <div key={`${hit.chunk_id}-${i}`} className="bg-zinc-800/60 rounded-lg px-3 py-2 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs text-zinc-300 truncate">
+                  <p className="text-sm text-zinc-300 truncate">
                     {hit.source_file || hit.doc_id}
-                    <span className="text-zinc-500"> · page {hit.page_num}</span>
+                    <span className="text-zinc-300"> · page {hit.page_num}</span>
                     {hit.section === "table" && <span className="ml-1 text-amber-400">table</span>}
                   </p>
-                  <p className="text-xs text-zinc-500 line-clamp-2 mt-0.5">{hit.text}</p>
+                  <p className="text-sm text-zinc-300 line-clamp-2 mt-0.5">{hit.text}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => hit.source_file && openInWorkbench(hit.source_file, hit.page_num)}
-                  className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-700 text-xs text-zinc-200 hover:bg-zinc-600 shrink-0"
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-700 text-sm text-zinc-200 hover:bg-zinc-600 shrink-0"
                   data-testid="open-page-btn"
                 >
                   <ExternalLink size={11} /> Open
@@ -336,7 +336,7 @@ export default function Chat() {
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
               <MessageSquare size={48} className="text-zinc-700" />
-              <p className="text-zinc-500 text-sm">Ask questions about your PDF documents</p>
+              <p className="text-zinc-300 text-sm">Ask questions about your PDF documents</p>
             </div>
           )}
           {messages.map((msg, i) => (
@@ -377,7 +377,7 @@ export default function Chat() {
                   type="button"
                   key={prompt}
                   onClick={() => setInput(prompt)}
-                  className="px-3 py-1.5 bg-zinc-800 rounded-lg text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
+                  className="px-3 py-1.5 bg-zinc-800 rounded-lg text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
                 >
                   {prompt}
                 </button>

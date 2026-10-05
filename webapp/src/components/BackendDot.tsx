@@ -36,7 +36,7 @@ export default function BackendDot() {
           backendOk === null ? "bg-zinc-500" : backendOk ? "bg-green-500 animate-pulse" : "bg-red-500"
         }`}
       />
-      <span className="text-xs text-zinc-500">{backendOk === null ? "Connecting..." : backendOk ? "Connected" : "Offline"}</span>
+      <span className="text-sm text-zinc-300">{backendOk === null ? "Connecting..." : backendOk ? "Connected" : "Offline"}</span>
     </div>
   );
 }

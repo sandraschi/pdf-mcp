@@ -10,7 +10,7 @@ export default function Topbar({ zoom }: { zoom?: number }) {
       <h1 className="text-lg font-semibold text-zinc-100">{pageTitle}</h1>
       <div className="flex items-center gap-3">
         {zoom !== undefined && (
-          <span className="text-xs text-zinc-500 font-mono" data-testid="zoom-indicator" title="Ctrl+scroll to zoom, Ctrl+0 to reset">
+          <span className="text-sm text-zinc-300 font-mono" data-testid="zoom-indicator" title="Ctrl+scroll to zoom, Ctrl+0 to reset">
             {Math.round(zoom * 100)}%
           </span>
         )}
@@ -20,7 +20,7 @@ export default function Topbar({ zoom }: { zoom?: number }) {
           }`}
           data-testid="topbar-dot"
         />
-        <span className="text-xs text-zinc-500">
+        <span className="text-sm text-zinc-300">
           {backendStatus === "connecting" ? "Connecting..." : backendStatus === "connected" ? "Connected" : "Offline"}
         </span>
       </div>
