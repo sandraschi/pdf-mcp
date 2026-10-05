@@ -5,9 +5,12 @@ import AppLayout from "./components/AppLayout";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Workbench = lazy(() => import("./pages/Workbench"));
 const Pipeline = lazy(() => import("./pages/Pipeline"));
+const Inbox = lazy(() => import("./pages/Inbox"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Tools = lazy(() => import("./pages/Tools"));
 const Skills = lazy(() => import("./pages/Skills"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Help = lazy(() => import("./pages/Help"));
 const Logs = lazy(() => import("./pages/Logs"));
 
 function Loading() {
@@ -26,9 +29,12 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/workbench" element={<Workbench />} />
           <Route path="/pipeline" element={<Pipeline />} />
+          <Route path="/inbox" element={<Inbox />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/skills" element={<Skills />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/help" element={<Help />} />
           <Route path="/logs" element={<Logs />} />
         </Routes>
       </Suspense>

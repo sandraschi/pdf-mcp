@@ -1,16 +1,32 @@
 import { useStore } from "@/lib/store";
 import { motion } from "framer-motion";
-import { BookOpen, ChevronLeft, ChevronRight, FileText, LayoutDashboard, MessageSquare, Terminal, Workflow, Wrench } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  HelpCircle,
+  Inbox,
+  LayoutDashboard,
+  MessageSquare,
+  Settings,
+  Terminal,
+  Workflow,
+  Wrench,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/workbench", label: "Workbench", icon: FileText },
   { to: "/pipeline", label: "Pipeline", icon: Workflow },
+  { to: "/inbox", label: "Inbox", icon: Inbox },
   { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/tools", label: "Tools", icon: Wrench },
   { to: "/skills", label: "Skills", icon: BookOpen },
+  { to: "/settings", label: "Settings", icon: Settings },
   { to: "/logs", label: "Logs", icon: Terminal },
+  { to: "/help", label: "Help", icon: HelpCircle },
 ];
 
 interface SidebarProps {
@@ -32,7 +48,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <button
           type="button"
           onClick={onToggle}
-          className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+          className="p-1.5 rounded-md text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
           data-testid="sidebar-toggle"
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -46,7 +62,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             to={item.to}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                isActive ? "bg-amber-500/10 text-amber-500" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+                isActive ? "bg-amber-500/10 text-amber-500" : "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
               }`
             }
             data-testid={`nav-${item.label.toLowerCase()}`}
@@ -65,7 +81,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           data-testid="backend-dot"
         />
         {!collapsed && (
-          <span className="text-xs text-zinc-500">{backendOk === null ? "Connecting..." : backendOk ? "Connected" : "Offline"}</span>
+          <span className="text-sm text-zinc-300">{backendOk === null ? "Connecting..." : backendOk ? "Connected" : "Offline"}</span>
         )}
       </div>
     </motion.aside>
