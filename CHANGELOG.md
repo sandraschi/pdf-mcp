@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased (2026-10-05)
+
+- **assfix pass** (2026-10-05) — HIGH/MEDIUM fixes:
+  - `webapp/src/lib/api.ts`: dropped the hardcoded `http://127.0.0.1:11131` base —
+    all calls are now same-origin (Vite proxy) and go absolute only inside the Tauri
+    WebView. Fixes CORS death for LAN/Tailscale browser tabs (1F).
+  - `pdf_mcp/server.py`: the `/api/jobs` dispatcher (`_run_operation`) now implements
+    `extract_metadata`, `extract_fonts`, `extract_links`, `extract_outline`, `to_images`,
+    `to_html`, and the `from_*` conversions — the Workbench Metadata / Fonts / To Images
+    buttons no longer produce failed jobs (1D).
+  - `pdf_mcp/server.py`: added `GET /api/llm/providers`, `GET /api/llm/models`,
+    `GET /api/llm/onboarding` and `POST /api/shutdown` (1E).
+  - `webapp/src/components/AppLayout.tsx`: global backend-health + LLM discovery on every
+    route (previously only Dashboard/Chat) (1D).
+  - `webapp/src/pages/Dashboard.tsx`: added a hero section + under-hero `onboarding-cue`
+    (1D / 1P P2).
+  - Tauri bridge: `@tauri-apps/api` dependency + `useBackendStatus()` listener for the
+    `backend-status` event (1A / 1D).
+  - `webapp/playwright.config.ts`: self-contained `webServer` (backend + frontend) so
+    `just e2e` and CI work without a pre-started stack (1L).
+  - `justfile`: added `build-native`, `cua-webapp-test`, `cua-nsis-test`; vendored
+    `scripts/cua-webapp-test.py` from the fleet template.
+  - `src-tauri/build.ps1`: bun/bunx instead of npm/npx on a bun-locked webapp.
+  - `src-tauri/capabilities/default.json`: `{PRODUCT_NAME}` -> `pdf-mcp`.
+  - `glama.json`: added `version`.
+  - See `docs/assess-reports/2026-10-05.md`. Deferred: Settings/Help/Inbox pages and
+    the MCPB `manifest.json` + 3-4-100 prompts (dedicated tasks).
+
 ## Unreleased (2026-09-17)
 
 - **assfix pass** (score 92 -> 80 drift found, both HIGH items fixed, back to 80+ clean gates):
