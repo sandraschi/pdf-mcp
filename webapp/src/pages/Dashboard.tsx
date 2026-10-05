@@ -63,6 +63,42 @@ export default function Dashboard() {
         <BackendDot />
       </div>
 
+      <section
+        className="bg-gradient-to-br from-zinc-900 to-zinc-900/40 border border-zinc-800 rounded-xl p-6"
+        data-testid="dashboard-hero"
+      >
+        <h3 className="text-lg font-semibold text-zinc-100">PDF intelligence, locally</h3>
+        <p className="text-sm text-zinc-400 mt-2 max-w-2xl">
+          Extract, manipulate, annotate, convert, validate, and RAG-search PDFs. Everything runs on your machine — the only optional extra
+          is a local LLM (Ollama / LM Studio) for chat, auto-fill, and the <span className="font-mono">pdf_do</span> agent.
+        </p>
+        <div className="flex flex-wrap gap-3 mt-4">
+          <a
+            href="/workbench"
+            className="px-4 py-2 bg-amber-500 text-black rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors"
+            data-testid="hero-cta-workbench"
+          >
+            Open Workbench
+          </a>
+          <a
+            href="/chat"
+            className="px-4 py-2 bg-zinc-800 text-zinc-200 rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors"
+            data-testid="hero-cta-chat"
+          >
+            Ask the AI
+          </a>
+        </div>
+        {backendOk === true && !llmProbing && !llmAvailable && (
+          <a
+            href="/chat"
+            className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-500 transition-colors"
+            data-testid="onboarding-cue"
+          >
+            <Cpu size={16} /> Set up a local LLM (optional)
+          </a>
+        )}
+      </section>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Server" icon={Server} value="pdf-mcp" testid="kpi-server" />
         <KpiCard label="Version" icon={Hash} value={version || null} testid="kpi-version" />

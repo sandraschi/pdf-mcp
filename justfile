@@ -64,6 +64,18 @@ bootstrap:
     bun install --cwd webapp
     Write-Host "Bootstrap complete: dev deps + pre-commit hooks + webapp deps installed." -ForegroundColor Green
 
+# Build the Tauri NSIS installer (frontend + PyInstaller backend + bundle)
+build-native:
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File src-tauri/build.ps1
+
+# CUA pre-Tauri browser walk (start stack + nav walk in browser)
+cua-webapp-test:
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/just/cua-webapp-test.ps1
+
+# CUA-NSIS smoke test (install -> launch -> nav walk -> uninstall)
+cua-nsis-test:
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/just/cua-nsis-test.ps1
+
 # Package an MCPB bundle (requires @anthropic-ai/mcpb CLI)
 mcpb-pack:
     npx @anthropic-ai/mcpb pack . dist/pdf-mcp-0.2.1.mcpb

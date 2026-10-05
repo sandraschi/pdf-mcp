@@ -1,3 +1,4 @@
+import { useBackendStatus } from "@/hooks/useBackendStatus";
 import { useZoom } from "@/hooks/useZoom";
 import { useStore } from "@/lib/store";
 import { motion } from "framer-motion";
@@ -10,8 +11,18 @@ import Topbar from "./Topbar";
 export default function AppLayout({ children }: { children: ReactNode }) {
   const collapsed = useStore((s) => s.sidebarCollapsed);
   const setCollapsed = useStore((s) => s.setSidebarCollapsed);
+  const healthCheck = useStore((s) => s.healthCheck);
+  const discoverLlm = useStore((s) => s.discoverLlm);
   const navigate = useNavigate();
   const { zoom } = useZoom();
+  useBackendStatus();
+
+  // Global bootstrap: poll backend health and probe for a local LLM on every
+  // route, so the status dot and Dashboard LLM banner are never stale.
+  useEffect(() => {
+    healthCheck();
+    discoverLlm();
+  }, [healthCheck, discoverLlm]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

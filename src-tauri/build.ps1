@@ -15,10 +15,10 @@ foreach ($dir in $frontendDirs) {
     if (Test-Path "$frontend\package.json") {
         Write-Host "-> [1/4] Building frontend ($dir)..." -ForegroundColor Yellow
         Push-Location $frontend
-        npm install --silent 2>$null
+        bun install --silent 2>$null
 
         Write-Host "  tsc --noEmit..." -ForegroundColor Gray
-        $tscOut = npx tsc --noEmit 2>&1
+        $tscOut = bunx tsc --noEmit 2>&1
         $tscExit = $LASTEXITCODE
         if ($tscExit -ne 0) {
             Write-Host "  TypeScript compilation FAILED - fix errors before building NSIS" -ForegroundColor Red
@@ -26,7 +26,7 @@ foreach ($dir in $frontendDirs) {
             throw "TypeScript compilation failed - fix all errors before building NSIS installer"
         }
 
-        npm run build
+        bun run build
         if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
         Pop-Location
         break
@@ -84,8 +84,8 @@ Write-Host "  Backend exe: $((Get-Item $src).Length / 1MB) MB" -ForegroundColor 
 # Step 4: Single NSIS installer
 Write-Host "-> [4/4] Tauri NSIS bundle..." -ForegroundColor Yellow
 Push-Location $PSScriptRoot
-$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-npx @tauri-apps/cli build --bundles nsis
+$env:Path = "$env:USERPROFILE\.cargo\bin;$env:USERPROFILE\.bun\bin;$env:Path"
+bunx @tauri-apps/cli build --bundles nsis
 if ($LASTEXITCODE -ne 0) { throw "Tauri build failed with exit code $LASTEXITCODE" }
 Pop-Location
 
