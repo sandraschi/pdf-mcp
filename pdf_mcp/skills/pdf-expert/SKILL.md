@@ -1,81 +1,110 @@
-# pdf-mcp Skill
+# pdf-mcp — Skill
 
 ## Overview
 
-pdf-mcp is a full-stack PDF intelligence MCP server. It provides 40+ operations across 7 portmanteau tools for extracting, manipulating, annotating, converting, validating, and RAG-searching PDF documents. Use it whenever the user needs to work with PDF files programmatically.
+pdf-mcp is a full-stack, local-first PDF intelligence MCP server. It exposes **16
+portmanteau tools** (`operation`-selected) covering extraction, manipulation, annotation,
+forms, conversion, validation, redaction, classification, deduplication, RAG, briefs, and
+an agentic chaining tool. The only optional dependency is a local LLM (Ollama / LM Studio)
+for chat, `pdf_do`, auto-fill, and summaries. Everything else works offline.
 
-## Tool Categories
+## Audience routing
 
-### pdf_extract — Extract content from PDFs
-- `text` — extract plain text from one or more pages
-- `images` — extract embedded images with dimensions and format info
-- `tables` — extract tabular data via pdfplumber
-- `metadata` — extract title, author, dates, page count, file size
-- `fonts` — list fonts used in the document
-- `links` — extract hyperlinks with page and coordinates
-- `outline` — extract table of contents as a nested tree
+- **Agent, exploratory task** ("what's in this PDF?", "find the clause") → start read-only:
+  `pdf_analyze` → `pdf_extract(metadata|outline|text)` → `pdf_rag(search)`.
+- **Agent, chained multi-step task** → `pdf_do(task=..., path=...)` (needs a local LLM).
+- **Agent, structured pipeline** → drive the operations explicitly and inspect each
+  `success` before continuing.
+- **Human at the webapp** → Workbench (view/compare/one-off tools), Pipeline (batch +
+  recipes), Chat (asks), Settings (LLM setup), Inbox (watch folder), Logs.
+- **Human scripting** → the REST surface (`/api/jobs`, `/api/rag/search`, `/api/health`).
 
-### pdf_manipulate — Modify PDF structure
-- `merge` — combine multiple PDFs into one
-- `split` — split into individual pages or page ranges
-- `rotate` — rotate pages by specified angle
-- `reorder` — rearrange pages in a new order
-- `delete_pages` — remove specific pages
-- `compress` — reduce file size via image downscaling
-- `encrypt` — password-protect a PDF
-- `decrypt` — remove password protection
-- `optimize` — clean and deflate the PDF structure
+## Tool catalogue (all 16)
 
-### pdf_annotate — Add markup and annotations
-- `watermark` — add text or image watermark (tile, center, corner positions)
-- `stamp` — add stamp annotation at specific coordinates
-- `highlight` — highlight all occurrences of search text
-- `underline` — underline all occurrences of search text
-- `header_footer` — add repeating header and footer text
-- `page_numbers` — add page numbers with configurable position and start
+Read-only inspection:
 
-### pdf_forms — Handle form fields
-- `list_fields` — enumerate all interactive form fields
-- `fill` — fill form fields with values
-- `flatten` — flatten form fields (make them non-interactive)
-- `export_data` — export field values as JSON
+- **`pdf_analyze`** — `scanned` vs digital, per-page layout stats. Always run before
+  extraction on an unknown file.
+- **`pdf_extract`** — ops: `text`, `images`, `tables`, `metadata`, `fonts`, `links`,
+  `outline`. Optional 1-indexed `pages` range.
+- **`pdf_validate`** — ops: `pdfa`, `structure`, `accessibility`, `integrity`, `compare`.
+- **`pdf_classify`** — document type (invoice, receipt, report, contract, form, resume,
+  letter, …). `refine=true` uses the LLM.
+- **`pdf_dedupe`** — exact + near duplicates over `paths`, `threshold` (default 0.85).
+- **`pdf_rag`** — ops: `chunk`, `index`, `search`, `similar`, `synthesize`,
+  `list_documents`, `delete_index`. Hits carry `source_file` + `page_num`.
 
-### pdf_convert — Convert between formats
-- `to_markdown` — extract text with heading detection as Markdown
-- `to_images` — render each page as PNG or JPEG
-- `to_html` — extract text as simple HTML
-- `from_html` — create PDF from HTML content
-- `from_markdown` — create PDF from Markdown content
-- `from_images` — create PDF from image files (one per page)
+Write (returns a new path; original untouched):
 
-### pdf_validate — Audit PDF quality
-- `pdfa` — check PDF/A compliance via metadata
-- `structure` — analyze headings, paragraphs, and content issues
-- `accessibility` — score 0-100 for language, tags, alt-text
-- `integrity` — verify all pages are readable without errors
-- `compare` — diff text content between two PDFs
+- **`pdf_manipulate`** — ops: `merge`, `split`, `rotate`, `reorder`, `delete_pages`,
+  `compress`, `encrypt`, `decrypt`, `optimize`.
+- **`pdf_annotate`** — ops: `watermark`, `stamp`, `highlight`, `underline`,
+  `header_footer`, `page_numbers`, `summary_box` (LLM).
+- **`pdf_convert`** — ops: `to_markdown`, `to_images`, `to_html`, `from_html`,
+  `from_markdown`, `from_images`.
+- **`pdf_forms`** — ops: `list_fields`, `fill`, `flatten`, `export_data`, `auto_fill` (LLM).
+- **`pdf_redact`** — blacken `terms` and/or `pii=true` (email, phone, IBAN, card, SSN, IP).
+- **`pdf_export`** — document brief as `markdown`/`json`, optional LLM summary.
 
-### pdf_rag — Build and query a RAG index
-- `chunk` — split PDF text into chunks (recursive or fixed strategy)
-- `index` — chunk and index into LanceDB vector store
-- `search` — semantic search across indexed chunks
-- `list_documents` — list all indexed documents with chunk counts
-- `delete_index` — remove an indexed document
+Agentic + meta:
 
-## Best Practices
+- **`pdf_do`** — plan + chain tools from a natural-language `task` (LLM required).
+- **`pdf_help`** — list tools or one tool's schema.
+- **`pdf_status`** — version, uptime, tool count, mode.
+- **`pdf_shutdown`** — graceful stop (destructive; only on explicit request).
 
-- **Extract before manipulating**: Use `pdf_extract` to understand a document's structure before applying manipulations.
-- **Use page ranges efficiently**: Operations support page ranges (e.g. "1-5,7,9-12") to target specific sections.
-- **Compress after merging**: Merging large documents increases file size — run compress afterward.
-- **Validate accessibility early**: Run `pdf_validate(operation="accessibility")` before distribution to catch missing language tags or heading structure.
-- **Index for repeated queries**: The `pdf_rag` tool persists chunks to LanceDB — re-running `search` is cheaper than re-processing the full PDF.
-- **Use `from_markdown` for clean PDFs**: Creating PDFs from Markdown produces better results than from raw HTML.
+## Workflows (copy-shape)
+
+**Inspect → act** (never manipulate what you haven't inspected):
+
+```
+pdf_analyze(path=...)                       # scanned?
+pdf_extract(operation="metadata", path=...)
+pdf_extract(operation="outline", path=...)
+```
+
+**Searchable corpus**:
+
+```
+pdf_rag(operation="index", path=...)        # note doc_id
+pdf_rag(operation="search", query=..., limit=8)
+pdf_rag(operation="synthesize", query=...)  # grounded answer (LLM optional)
+pdf_rag(operation="delete_index", doc_id=...)  # when superseded
+```
+
+**Clean before sharing**:
+
+```
+pdf_redact(path=..., pii=true)              # -> new path
+pdf_extract(operation="text", path=<redacted>)  # verify
+```
+
+**Pipeline batch** (HTTP): `POST /api/jobs {"recipe":"ingest"|"redact_export"|"brief",
+"params":{"filename":...}}`, or drop PDFs in `data/watch/` for automatic `ingest`.
 
 ## Configuration
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| MCP_MODE | stdio | Server transport mode |
-| MCP_PORT | 11131 | HTTP port when in http mode |
-| RAG_EMBEDDING_URL | (none) | OpenAI-compatible embedding API |
-| RAG_EMBEDDING_MODEL | all-MiniLM-L6-v2 | Embedding model name |
+| `MCP_MODE` | `stdio` | `stdio` or `http` |
+| `MCP_PORT` / `FRONTEND_PORT` | 11131 / 11130 | HTTP ports |
+| `RAG_EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | embedding model |
+| `RAG_STORE_PATH` | `data/lancedb` | vector store |
+| `UPLOAD_DIR` | `data/uploads` | outputs |
+
+## Troubleshooting
+
+- **Empty extraction** → the PDF is scanned (`pdf_analyze` confirms). OCR elsewhere first.
+- **No RAG results** → nothing indexed (`pdf_rag(list_documents)`) or the `rag` extra is
+  missing (`uv sync --extra rag`) so only the weak hash-embedding fallback runs.
+- **Chat/`pdf_do` say "no LLM"** → start Ollama (`ollama serve`) or LM Studio, then
+  `pdf_help`/Settings to confirm detection.
+- **`fill` changes nothing** → run `list_fields` and match names exactly.
+- **Can't find an output** → every write tool returns the full path under `UPLOAD_DIR`.
+- **Backend dot red** → backend not started or wrong port; check `GET /api/health`.
+
+## Safety
+
+Local-first, no uploads. Mutations write new files. Redaction is irreversible on the output
+— work on a copy and verify by extraction. Do not index documents containing secrets you
+would not keep locally. `pdf_shutdown` only on explicit request.

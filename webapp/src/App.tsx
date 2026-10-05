@@ -9,6 +9,7 @@ const Inbox = lazy(() => import("./pages/Inbox"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Tools = lazy(() => import("./pages/Tools"));
 const Skills = lazy(() => import("./pages/Skills"));
+const Apps = lazy(() => import("./pages/Apps"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Help = lazy(() => import("./pages/Help"));
 const Logs = lazy(() => import("./pages/Logs"));
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/skills" element={<Skills />} />
+          <Route path="/apps" element={<Apps />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/help" element={<Help />} />
           <Route path="/logs" element={<Logs />} />

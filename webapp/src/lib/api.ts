@@ -231,3 +231,13 @@ export async function fetchDiagnostics(): Promise<{
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
+
+export async function fetchFleetApps(): Promise<{
+  apps: Array<{ name?: string; port?: number; frontend_port?: number; repo?: string; [k: string]: unknown }>;
+  registry: boolean;
+  source: string | null;
+}> {
+  const r = await fetch(`${API_BASE}/api/fleet/apps`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}

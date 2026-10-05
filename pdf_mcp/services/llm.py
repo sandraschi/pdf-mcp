@@ -79,3 +79,40 @@ async def chat_completion(messages: list[dict], provider: str | None = None, mod
         r.raise_for_status()
         data = r.json()
         return data["choices"][0]["message"]["content"]
+
+
+async def chat_completion_stream(messages: list[dict], provider: str | None = None, model: str | None = None):
+    """Yield content deltas from a local OpenAI-compatible streaming endpoint.
+
+    Raises if no provider is reachable. Both Ollama and LM Studio expose
+    SSE at /v1/chat/completions with ``stream: true``.
+    """
+    import json
+
+    import httpx
+
+    if not provider or not model:
+        provider, model, _ = await default_provider()
+    if not provider or not model:
+        raise RuntimeError("No local LLM detected (Ollama 127.0.0.1:11434 or LM Studio 127.0.0.1:1234).")
+    base = _OLLAMA if provider == "ollama" else _LM_STUDIO
+    async with httpx.AsyncClient(timeout=90) as client:
+        async with client.stream(
+            "POST",
+            f"{base}/v1/chat/completions",
+            json={"model": model, "messages": messages, "stream": True},
+        ) as r:
+            r.raise_for_status()
+            async for line in r.aiter_lines():
+                if not line or not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    delta = json.loads(payload)["choices"][0].get("delta", {})
+                except Exception:
+                    continue
+                piece = delta.get("content")
+                if piece:
+                    yield piece

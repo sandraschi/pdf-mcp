@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import secrets
@@ -16,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
 
 from pdf_mcp.config import cfg
 from pdf_mcp.services.llm import chat_completion as _llm_chat_completion
@@ -592,6 +593,73 @@ def create_http_app():
         threading.Timer(0.5, lambda: os._exit(0)).start()
         return JSONResponse({"status": "shutting down"})
 
+    async def llm_chat(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON payload."}, status_code=400)
+        messages = payload.get("messages") or []
+        try:
+            content = await _llm_chat_completion(messages, payload.get("provider"), payload.get("model"))
+            return JSONResponse({"content": content})
+        except Exception as e:
+            logger.exception("llm/chat failed: %s", e)
+            return JSONResponse({"content": f"Chat failed: {e}"})
+
+    async def llm_chat_stream(request: Request) -> StreamingResponse | JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON payload."}, status_code=400)
+        messages = payload.get("messages") or []
+        provider = payload.get("provider")
+        model = payload.get("model")
+        from pdf_mcp.services.llm import chat_completion_stream
+
+        async def event_stream():
+            try:
+                async for piece in chat_completion_stream(messages, provider, model):
+                    yield f"data: {json.dumps({'delta': piece})}\n\n"
+            except Exception as e:  # noqa: BLE001 - surfaced to the client as an SSE error frame
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+    async def fleet_apps(request: Request) -> JSONResponse:
+        candidates = [
+            os.getenv("FLEET_WEBAPP_MANIFEST"),
+            str(cfg.repo_root.parent / "mcp-central-docs" / "scripts" / "fleet-webapp-manifest.json"),
+            str(cfg.repo_root.parent / "mcp-central-docs" / "operations" / "fleet-webapp-manifest.json"),
+        ]
+        manifest = None
+        source = None
+        for cand in candidates:
+            if not cand:
+                continue
+            p = Path(cand)
+            if p.exists():
+                try:
+                    manifest = json.loads(p.read_text(encoding="utf-8"))
+                    source = str(p)
+                    break
+                except Exception:
+                    manifest = None
+        raw = manifest
+        if isinstance(manifest, dict):
+            raw = manifest.get("apps") or manifest.get("webapps") or []
+        apps: list[dict] = []
+        if isinstance(raw, list):
+            for item in raw:
+                if not isinstance(item, dict):
+                    continue
+                entry = dict(item)
+                entry.setdefault("name", entry.get("repo"))
+                if "frontend_port" not in entry and "frontendPort" in entry:
+                    entry["frontend_port"] = entry["frontendPort"]
+                apps.append(entry)
+        return JSONResponse({"apps": apps, "registry": manifest is not None, "source": source})
+
     async def chat(request: Request) -> JSONResponse:
         try:
             payload = await request.json()
@@ -783,6 +851,9 @@ def create_http_app():
     app.add_route("/api/llm/providers", llm_providers)
     app.add_route("/api/llm/models", llm_models)
     app.add_route("/api/llm/onboarding", llm_onboarding)
+    app.add_route("/api/llm/chat", llm_chat, methods=["POST"])
+    app.add_route("/api/llm/chat/stream", llm_chat_stream, methods=["POST"])
+    app.add_route("/api/fleet/apps", fleet_apps)
     app.add_route("/api/shutdown", shutdown, methods=["POST"])
     app.add_route("/api/chat", chat, methods=["POST"])
     app.add_route("/api/pdf/upload", upload_pdf, methods=["POST"])
