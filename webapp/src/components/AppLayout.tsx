@@ -33,7 +33,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         navigate("/logs");
       } else if (key === "h") {
         e.preventDefault();
-        navigate("/tools");
+        navigate("/help");
       } else if (key === "k") {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent("pdf-search-focus"));

@@ -2,6 +2,7 @@ import { useStore } from "@/lib/store";
 import { motion } from "framer-motion";
 import {
   BookOpen,
+  Boxes,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -24,6 +25,7 @@ const navItems = [
   { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/tools", label: "Tools", icon: Wrench },
   { to: "/skills", label: "Skills", icon: BookOpen },
+  { to: "/apps", label: "Apps", icon: Boxes },
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/logs", label: "Logs", icon: Terminal },
   { to: "/help", label: "Help", icon: HelpCircle },

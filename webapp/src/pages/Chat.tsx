@@ -1,4 +1,4 @@
-import { type RagHit, fetchChat, fetchSkillContent, fetchSkills, ragSearch } from "@/lib/api";
+import { API_BASE, type RagHit, fetchSkillContent, fetchSkills, ragSearch } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { motion } from "framer-motion";
 import { Cpu, Download, Eraser, ExternalLink, MessageSquare, Search, Send } from "lucide-react";
@@ -141,14 +141,55 @@ export default function Chat() {
 
     try {
       const history = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }));
-      const res = await fetchChat([{ role: "system", content: systemPrompt }, ...history], personality, llmProvider, llmModel);
-      const assistantMsg: Message = { role: "assistant", content: res.content, ts: new Date().toISOString() };
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "", ts: new Date().toISOString() }]);
+      const res = await fetch(`${API_BASE}/api/llm/chat/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "system", content: systemPrompt }, ...history], provider: llmProvider, model: llmModel }),
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() || "";
+        for (const frame of frames) {
+          const line = frame.trim();
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (data === "[DONE]") continue;
+          let obj: { delta?: string; error?: string };
+          try {
+            obj = JSON.parse(data);
+          } catch {
+            continue;
+          }
+          if (obj.error) throw new Error(obj.error);
+          if (obj.delta) {
+            acc += obj.delta;
+            setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: acc } : m)));
+          }
+        }
+      }
+      if (!acc) {
+        setMessages((prev) =>
+          prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: "(no response — is a local LLM running?)" } : m)),
+        );
+      }
     } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `Error: ${e instanceof Error ? e.message : "Request failed"}`, ts: new Date().toISOString() },
-      ]);
+      const msg = `Error: ${e instanceof Error ? e.message : "Request failed"}`;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && last.content === "") {
+          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
+        }
+        return [...prev, { role: "assistant", content: msg, ts: new Date().toISOString() }];
+      });
     }
     setLoading(false);
   }, [input, loading, messages, personality, skillText, llmProvider, llmModel]);

@@ -6,7 +6,7 @@ const shortcuts = [
   { keys: "Ctrl + Scroll", action: "Zoom in/out (persisted)" },
   { keys: "Ctrl + 0", action: "Reset zoom to 100%" },
   { keys: "Ctrl + L", action: "Open Logs" },
-  { keys: "Ctrl + H", action: "Open Tools" },
+  { keys: "Ctrl + H", action: "Open Help" },
   { keys: "Ctrl + K", action: "Focus the Chat PDF search" },
 ];
 
