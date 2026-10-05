@@ -273,6 +273,10 @@ webapp/
 | `/api/skills` | GET | Skill list |
 | `/api/skills/{name}` | GET | Raw SKILL.md content |
 | `/api/llm/discover` | GET | Ollama / LM Studio detection |
+| `/api/llm/providers` | GET | Public provider list (availability + models; never key bytes) |
+| `/api/llm/models` | GET | Model list (optional `?provider=`) |
+| `/api/llm/onboarding` | GET | Fresh-install guidance + LLM-detected flag |
+| `/api/shutdown` | POST | Orderly server exit |
 | `/api/chat` | POST | LLM chat completion |
 | `/api/pdf/upload` | POST | Upload PDF (multipart) |
 | `/api/pdf/files/{name}` | GET | Serve an uploaded file (for the viewer) |

@@ -47,6 +47,10 @@ pdf-mcp exposes 16 MCP tools. Each domain tool is a portmanteau: one tool name, 
 | `/api/skills` | GET | Skill list |
 | `/api/skills/{name}` | GET | Raw SKILL.md content |
 | `/api/llm/discover` | GET | Ollama / LM Studio detection |
+| `/api/llm/providers` | GET | Public provider list (availability + model names; never key bytes) |
+| `/api/llm/models` | GET | Model list (optionally `?provider=`) |
+| `/api/llm/onboarding` | GET | Fresh-install guidance + whether an LLM was detected |
+| `/api/shutdown` | POST | Orderly server exit (launcher restart hook) |
 | `/api/chat` | POST | LLM chat completion |
 | `/api/pdf/upload` | POST | Multipart PDF upload |
 | `/api/jobs` | GET/POST | List / create batch jobs (also accepts `recipe`) |

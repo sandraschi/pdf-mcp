@@ -1,5 +1,6 @@
 {
   "name": "pdf-mcp",
+  "version": "0.2.1",
   "description": "Full-stack PDF intelligence MCP server — extract, manipulate, annotate, convert, validate, redact, classify, and RAG-search PDFs with an agentic pdf_do tool",
   "repository": "https://github.com/sandraschi/pdf-mcp",
   "server_type": "python",
