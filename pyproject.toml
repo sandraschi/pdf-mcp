@@ -21,7 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 rag = ["sentence-transformers"]
-test = ["pytest", "pytest-asyncio", "httpx"]
+test = ["pytest", "pytest-asyncio", "pytest-cov", "httpx"]
 dev = ["ruff>=0.16.0,<0.17", "pyright", "pre-commit"]
 
 [build-system]
@@ -47,6 +47,12 @@ quote-style = "double"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "--cov=pdf_mcp --cov-report=term-missing --cov-fail-under=30"
+
+# Scope the naked `pyright` run to the package (the vendored CUA templates under
+# scripts/ are intentionally untyped 1:1 fleet copies). CI also passes pdf_mcp/.
+[tool.pyright]
+include = ["pdf_mcp"]
 
 [dependency-groups]
 dev = [

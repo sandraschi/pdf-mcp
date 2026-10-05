@@ -27,6 +27,9 @@ cua-reports/
 mcpb/
 .ruff_cache/
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 webapp/.vite/
 build/
 webapp/package-lock.json
