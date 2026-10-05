@@ -1,6 +1,6 @@
 import { fetchSkillContent, fetchSkills } from "@/lib/api";
 import { motion } from "framer-motion";
-import { BookOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 function escapeHtml(s: string): string {
@@ -32,12 +32,18 @@ export default function Skills() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchSkills()
       .then(setSkills)
       .catch(() => {});
   }, []);
+
+  const q = search.trim().toLowerCase();
+  const filteredSkills = skills
+    .filter((s) => !q || s.name.toLowerCase().includes(q) || (s.description || "").toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const handleExpand = async (name: string) => {
     if (expanded === name) {
@@ -60,8 +66,23 @@ export default function Skills() {
     <div className="max-w-4xl mx-auto space-y-6" data-testid="skills">
       <div>
         <h2 className="text-2xl font-bold text-zinc-100">Skills</h2>
-        <p className="text-sm text-zinc-300 mt-1">Available MCP skills and instructions</p>
+        <p className="text-sm text-zinc-300 mt-1">
+          {filteredSkills.length} of {skills.length} MCP skills and instructions
+        </p>
       </div>
+
+      {skills.length > 0 && (
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-300" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search skills..."
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-9 pr-3 py-2 text-sm text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-amber-500"
+            data-testid="skills-search"
+          />
+        </div>
+      )}
 
       {skills.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-zinc-300">
@@ -70,7 +91,7 @@ export default function Skills() {
         </div>
       ) : (
         <div className="space-y-3" data-testid="skills-list">
-          {skills.map((skill) => {
+          {filteredSkills.map((skill) => {
             const isExpanded = expanded === skill.name;
             return (
               <motion.div

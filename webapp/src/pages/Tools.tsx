@@ -1,11 +1,12 @@
 import { fetchTools } from "@/lib/api";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronRight, Wrench } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function Tools() {
   const [tools, setTools] = useState<Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchTools()
@@ -13,12 +14,32 @@ export default function Tools() {
       .catch(() => {});
   }, []);
 
+  const q = search.trim().toLowerCase();
+  const filteredTools = tools
+    .filter((t) => !q || t.name.toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <div className="max-w-4xl mx-auto space-y-6" data-testid="tools">
       <div>
         <h2 className="text-2xl font-bold text-zinc-100">Tools</h2>
-        <p className="text-sm text-zinc-300 mt-1">{tools.length} tools available</p>
+        <p className="text-sm text-zinc-300 mt-1">
+          {filteredTools.length} of {tools.length} tools available
+        </p>
       </div>
+
+      {tools.length > 0 && (
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-300" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search tools..."
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-9 pr-3 py-2 text-sm text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-amber-500"
+            data-testid="tools-search"
+          />
+        </div>
+      )}
 
       {tools.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-zinc-300">
@@ -27,7 +48,7 @@ export default function Tools() {
         </div>
       ) : (
         <div className="space-y-3" data-testid="tools-list">
-          {tools.map((tool) => {
+          {filteredTools.map((tool) => {
             const isExpanded = expanded === tool.name;
             const schema = tool.inputSchema;
             const properties = (schema?.properties as Record<string, { description?: string; type?: string }>) || {};
