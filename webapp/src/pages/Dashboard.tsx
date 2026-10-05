@@ -36,6 +36,7 @@ function KpiCard({ label, icon: Icon, value, testid }: { label: string; icon: ty
 export default function Dashboard() {
   const version = useStore((s) => s.version);
   const toolCount = useStore((s) => s.toolCount);
+  const capabilities = useStore((s) => s.capabilities);
   const uptime = useStore((s) => s.uptime);
   const backendOk = useStore((s) => s.backendOk);
   const llmAvailable = useStore((s) => s.llmAvailable);
@@ -102,7 +103,12 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Server" icon={Server} value="pdf-mcp" testid="kpi-server" />
         <KpiCard label="Version" icon={Hash} value={version || null} testid="kpi-version" />
-        <KpiCard label="Tools" icon={Activity} value={toolCount > 0 ? String(toolCount) : null} testid="kpi-tools" />
+        <KpiCard
+          label="Tools"
+          icon={Activity}
+          value={(capabilities?.tool_surface.total ?? toolCount) > 0 ? String(capabilities?.tool_surface.total ?? toolCount) : null}
+          testid="kpi-tools"
+        />
         <KpiCard label="Uptime" icon={Clock} value={uptime > 0 ? formatUptime(uptime) : null} testid="kpi-uptime" />
       </div>
 
