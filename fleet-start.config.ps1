@@ -1,4 +1,4 @@
-﻿# Per-repo fleet start config for pdf-mcp
+# Per-repo fleet start config for pdf-mcp
 # Edit ports/backend target here - start.ps1 is fleet-standard.
 @{
     Name         = 'pdf-mcp'
@@ -10,6 +10,7 @@
         Kind       = 'module-serve'
         Module     = 'pdf_mcp'
         SyncExtras = @('dev')
+        SyncOnStart  = $true
     }
     Frontend = @{
         Kind           = 'vite-npm'
