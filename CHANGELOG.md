@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased (2026-10-05) — deferred work + cold re-score
+
+- **Deferred items completed**: Settings/Help/Inbox pages (+ Apps hub); full MCPB track
+  (`manifest.json`, 256×256 icon, 3-4-100 prompts: system 3284w / user 4081w / 112
+  examples, `scripts/mcpb-pack.ps1` fresh-stage packer, `just mcpb-pack` rewired);
+  font/contrast normalization (0 `text-xs`/low-contrast remaining); Pipeline list
+  search/sort/filter/pagination.
+- **Cold re-score** (fresh read-only subagent audits): 66 → 75 → **83/100**, 0 CRITICAL
+  0 HIGH. Caught and fixed: broken `.claude-plugin` hooks path, unscoped pyright
+  failures, missing coverage threshold, missing streaming chat + Apps Hub, and a
+  non-conforming `/api/capabilities` (now exact `WEBAPP_STANDARDS.md` §1.4 shape, consumed
+  by the webapp).
+- Accepted deviations: stdio→HTTP `create_proxy()` (no NSSM; modes mutually exclusive)
+  and Starlette-not-FastAPI (top-level `mcp.http_app()` is the standard's "no wrapper
+  needed" case).
+
 ## Unreleased (2026-10-05)
 
 - **assfix pass** (2026-10-05) — HIGH/MEDIUM fixes:

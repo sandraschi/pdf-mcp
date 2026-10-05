@@ -1,1 +1,1 @@
-{"timestamp": "2026-10-05T21:31:58.9896075+02:00", "commit": "916b2f40887935c558b81ccef8a13d678f729725", "host": "Goliath", "score_before": 25, "score_after": 72, "report": "docs/assess-reports/2026-10-05.md"}
+{"timestamp": "2026-10-05T22:19:00.5753777+02:00", "commit": "1537c0323b017608b1c389749a9d2103e1652be4", "host": "Goliath", "score_before": 25, "score_after": 83, "cold_score": 83, "cold_method": "fresh read-only subagent audits (3 passes: 66 -> 75 -> 83)", "report": "docs/assess-reports/2026-10-05.md"}
