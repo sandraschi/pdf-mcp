@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import secrets
 import sys
 import threading
@@ -347,7 +348,7 @@ async def _run_operation(operation: str, params: dict) -> dict:
     if not path and operation not in ("merge", "search", "list_documents"):
         return _fail("No source file found. Upload a PDF first (POST /api/pdf/upload).")
 
-    if operation in ("extract_text", "extract_images", "extract_tables"):
+    if operation in ("extract_text", "extract_images", "extract_tables", "extract_metadata", "extract_fonts", "extract_links", "extract_outline"):
         from pdf_mcp.models import PdfExtractOperation
 
         return await pdf_extract(operation=cast(PdfExtractOperation, operation.removeprefix("extract_")), path=path or "")
@@ -364,8 +365,17 @@ async def _run_operation(operation: str, params: dict) -> dict:
         return await pdf_manipulate(operation="merge", path=path or "", paths=params.get("paths") or [])
     if operation == "split":
         return await pdf_manipulate(operation="split", path=path or "", output_dir=str(cfg.upload_dir / "split"))
-    if operation == "convert_markdown":
+    if operation in ("convert_markdown",):
         return await pdf_convert(operation="to_markdown", path=path or "")
+    if operation in ("to_markdown", "to_images", "to_html"):
+        return await pdf_convert(operation=cast(Any, operation), path=path or "")
+    if operation in ("from_html", "from_markdown", "from_images"):
+        return await pdf_convert(
+            operation=cast(Any, operation),
+            html=params.get("html"),
+            markdown=params.get("markdown"),
+            paths=params.get("paths"),
+        )
     if operation in ("watermark", "stamp", "highlight", "underline", "header_footer", "page_numbers", "summary_box"):
         return await pdf_annotate(operation=operation, path=path or "", text=params.get("text"))
     if operation in ("list_fields", "fill", "flatten", "export_data", "auto_fill"):
@@ -540,6 +550,47 @@ def create_http_app():
                 "default_provider": next((k for k, v in providers.items() if v["available"]), None),
             }
         )
+
+    async def llm_providers(request: Request) -> JSONResponse:
+        providers = await _discover_providers()
+        # Public shape only — never key bytes or secrets.
+        public = {
+            k: {
+                "name": v.get("name"),
+                "base_url": v.get("base_url"),
+                "available": bool(v.get("available")),
+                "configured": bool(v.get("available")),
+                "models": list(v.get("models") or []),
+            }
+            for k, v in providers.items()
+        }
+        return JSONResponse({"providers": public})
+
+    async def llm_models(request: Request) -> JSONResponse:
+        providers = await _discover_providers()
+        provider_id = request.query_params.get("provider")
+        if provider_id:
+            return JSONResponse({"provider": provider_id, "models": list(providers.get(provider_id, {}).get("models") or [])})
+        return JSONResponse({"providers": {k: list(v.get("models") or []) for k, v in providers.items()}})
+
+    async def llm_onboarding(request: Request) -> JSONResponse:
+        providers = await _discover_providers()
+        available = next((k for k, v in providers.items() if v.get("available")), None)
+        return JSONResponse(
+            {
+                "llm_required": False,
+                "llm_detected": available is not None,
+                "recommended_provider": available or "ollama",
+                "steps": [
+                    "PDF extract / convert / validate / RAG work without any LLM.",
+                    "For chat and pdf_do, install Ollama (run `ollama serve`) or LM Studio.",
+                ],
+            }
+        )
+
+    async def shutdown(request: Request) -> JSONResponse:
+        threading.Timer(0.5, lambda: os._exit(0)).start()
+        return JSONResponse({"status": "shutting down"})
 
     async def chat(request: Request) -> JSONResponse:
         try:
@@ -729,6 +780,10 @@ def create_http_app():
     app.add_route("/api/skills", list_skills)
     app.add_route("/api/skills/{name}", get_skill)
     app.add_route("/api/llm/discover", llm_discover)
+    app.add_route("/api/llm/providers", llm_providers)
+    app.add_route("/api/llm/models", llm_models)
+    app.add_route("/api/llm/onboarding", llm_onboarding)
+    app.add_route("/api/shutdown", shutdown, methods=["POST"])
     app.add_route("/api/chat", chat, methods=["POST"])
     app.add_route("/api/pdf/upload", upload_pdf, methods=["POST"])
     app.add_route("/api/pdf/files/{name}", get_uploaded_file)
@@ -762,7 +817,14 @@ def main():
     parser.add_argument("--mode", choices=["stdio", "http"], default=cfg.mode)
     parser.add_argument("--host", default=cfg.host)
     parser.add_argument("--port", type=int, default=cfg.port)
+    # Fleet launcher default (module-serve passes `--serve`): http on cfg port.
+    # Added 2026-09-29 — without it the argparser errored and the backend
+    # never listened (nightly: frontend up, backend silent).
+    parser.add_argument("--serve", action="store_true", help="Serve HTTP (same as --mode http)")
     args = parser.parse_args()
+
+    if args.serve:
+        args.mode = "http"
 
     cfg.mode = args.mode
     cfg.host = args.host

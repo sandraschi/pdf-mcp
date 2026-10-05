@@ -1,6 +1,18 @@
-const API_BASE = "http://127.0.0.1:11131";
+// Same-origin by default (the Vite dev server proxies /api and /mcp to :11131),
+// so a browser tab on localhost, a LAN name, or a Tailscale MagicDNS host all work.
+// Only inside the Tauri WebView — which has no dev-server proxy — do we call the
+// backend directly on its loopback port.
+function resolveApiBase(): string {
+  if (typeof window !== "undefined") {
+    const w = window as unknown as { __TAURI__?: unknown; __TAURI_INTERNALS__?: unknown };
+    if (w.__TAURI__ || w.__TAURI_INTERNALS__ || window.location.hostname === "tauri.localhost") {
+      return "http://127.0.0.1:11131";
+    }
+  }
+  return "";
+}
 
-export { API_BASE };
+export const API_BASE = resolveApiBase();
 
 export async function fetchHealth(): Promise<{ status: string; version: string; uptime_seconds: number; tool_count: number }> {
   const r = await fetch(`${API_BASE}/api/health`);
