@@ -37,9 +37,9 @@ export default function Logs() {
       case "info":
         return "text-blue-400";
       case "debug":
-        return "text-zinc-500";
+        return "text-zinc-300";
       default:
-        return "text-zinc-400";
+        return "text-zinc-300";
     }
   };
 
@@ -48,13 +48,13 @@ export default function Logs() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-2xl font-bold text-zinc-100">Logs</h2>
-          <p className="text-sm text-zinc-500 mt-1">Server logs and events</p>
+          <p className="text-sm text-zinc-300 mt-1">Server logs and events</p>
         </div>
         <button
           type="button"
           onClick={load}
           disabled={loading}
-          className="p-2 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+          className="p-2 rounded-lg text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
           data-testid="logs-refresh"
         >
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
@@ -63,7 +63,7 @@ export default function Logs() {
 
       <div className="flex items-center gap-3 mb-4">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-300" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -78,8 +78,8 @@ export default function Logs() {
               type="button"
               key={l}
               onClick={() => setLevel(l)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                level === l ? "bg-amber-500 text-black" : "bg-zinc-800 text-zinc-400 hover:text-zinc-100"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                level === l ? "bg-amber-500 text-black" : "bg-zinc-800 text-zinc-300 hover:text-zinc-100"
               }`}
             >
               {l}
@@ -89,14 +89,14 @@ export default function Logs() {
       </div>
 
       <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[140px_70px_1fr] gap-0 text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3 border-b border-zinc-800">
+        <div className="grid grid-cols-[140px_70px_1fr] gap-0 text-sm font-medium text-zinc-300 uppercase tracking-wider px-4 py-3 border-b border-zinc-800">
           <span>Timestamp</span>
           <span>Level</span>
           <span>Message</span>
         </div>
         <div className="overflow-y-auto h-full max-h-[calc(100vh-280px)]">
           {logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-zinc-600">
+            <div className="flex flex-col items-center justify-center py-16 text-zinc-300">
               <Terminal size={36} className="mb-2 opacity-50" />
               <p className="text-sm">No logs yet</p>
             </div>
@@ -106,13 +106,13 @@ export default function Logs() {
                 key={`${log.timestamp}-${i}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="grid grid-cols-[140px_70px_1fr] gap-0 px-4 py-2 text-xs border-b border-zinc-800/30 hover:bg-zinc-800/30 transition-colors font-mono"
+                className="grid grid-cols-[140px_70px_1fr] gap-0 px-4 py-2 text-sm border-b border-zinc-800/30 hover:bg-zinc-800/30 transition-colors font-mono"
               >
-                <span className="text-zinc-600">{log.timestamp}</span>
+                <span className="text-zinc-300">{log.timestamp}</span>
                 <span className={levelColor(log.level)}>{log.level}</span>
                 <div className="flex gap-2">
-                  {log.source && <span className="text-zinc-600 shrink-0">[{log.source}]</span>}
-                  <span className="text-zinc-400 truncate">{log.message}</span>
+                  {log.source && <span className="text-zinc-300 shrink-0">[{log.source}]</span>}
+                  <span className="text-zinc-300 truncate">{log.message}</span>
                 </div>
               </motion.div>
             ))

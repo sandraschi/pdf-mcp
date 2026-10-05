@@ -17,11 +17,11 @@ export default function Tools() {
     <div className="max-w-4xl mx-auto space-y-6" data-testid="tools">
       <div>
         <h2 className="text-2xl font-bold text-zinc-100">Tools</h2>
-        <p className="text-sm text-zinc-500 mt-1">{tools.length} tools available</p>
+        <p className="text-sm text-zinc-300 mt-1">{tools.length} tools available</p>
       </div>
 
       {tools.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
+        <div className="flex flex-col items-center justify-center py-20 text-zinc-300">
           <Wrench size={48} className="mb-3 opacity-50" />
           <p className="text-sm">No tools discovered. Is the backend running?</p>
         </div>
@@ -54,22 +54,22 @@ export default function Tools() {
                     </div>
                     <div className="text-left">
                       <p className="text-sm font-medium text-zinc-100">{tool.name}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">{tool.description}</p>
+                      <p className="text-sm text-zinc-300 mt-0.5 line-clamp-1">{tool.description}</p>
                     </div>
                   </div>
-                  {isExpanded ? <ChevronDown size={16} className="text-zinc-500" /> : <ChevronRight size={16} className="text-zinc-500" />}
+                  {isExpanded ? <ChevronDown size={16} className="text-zinc-300" /> : <ChevronRight size={16} className="text-zinc-300" />}
                 </button>
 
                 {isExpanded && (
                   <div className="px-5 pb-4 space-y-3 border-t border-zinc-800 pt-3" data-testid="tool-details">
-                    <p className="text-sm text-zinc-400">{tool.description}</p>
+                    <p className="text-sm text-zinc-300">{tool.description}</p>
 
                     {subOps && subOps.length > 0 && (
                       <div>
-                        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Sub-operations</p>
+                        <p className="text-sm font-medium text-zinc-300 uppercase tracking-wider mb-2">Sub-operations</p>
                         <div className="flex flex-wrap gap-2">
                           {subOps.map((op) => (
-                            <span key={op} className="px-2.5 py-1 bg-zinc-800 rounded text-xs text-zinc-300">
+                            <span key={op} className="px-2.5 py-1 bg-zinc-800 rounded text-sm text-zinc-300">
                               {op}
                             </span>
                           ))}
@@ -79,12 +79,12 @@ export default function Tools() {
 
                     {Object.keys(properties).length > 0 && (
                       <div>
-                        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Parameters</p>
+                        <p className="text-sm font-medium text-zinc-300 uppercase tracking-wider mb-2">Parameters</p>
                         <div className="space-y-1">
                           {Object.entries(properties).map(([key, val]) => (
-                            <div key={key} className="flex items-start gap-2 text-xs">
+                            <div key={key} className="flex items-start gap-2 text-sm">
                               <span className="font-mono text-amber-400/80 whitespace-nowrap">{key}</span>
-                              <span className="text-zinc-500">{val?.type || "any"}</span>
+                              <span className="text-zinc-300">{val?.type || "any"}</span>
                               {required.includes(key) && <span className="text-red-400">required</span>}
                             </div>
                           ))}

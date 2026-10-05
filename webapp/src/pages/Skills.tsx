@@ -15,14 +15,14 @@ function renderMarkdown(text: string) {
       if (line.startsWith("### ")) return `<h3 class="text-base font-semibold text-zinc-100 mt-4 mb-2">${escapeHtml(line.slice(4))}</h3>`;
       if (line.startsWith("## ")) return `<h2 class="text-lg font-semibold text-amber-500 mt-5 mb-2">${escapeHtml(line.slice(3))}</h2>`;
       if (line.startsWith("# ")) return `<h1 class="text-xl font-bold text-zinc-100 mt-5 mb-3">${escapeHtml(line.slice(2))}</h1>`;
-      if (line.startsWith("- ")) return `<li class="text-sm text-zinc-400 ml-4 list-disc">${escapeHtml(line.slice(2))}</li>`;
+      if (line.startsWith("- ")) return `<li class="text-sm text-zinc-300 ml-4 list-disc">${escapeHtml(line.slice(2))}</li>`;
       if (line.startsWith("> "))
-        return `<blockquote class="border-l-2 border-amber-500/50 pl-3 text-zinc-500 italic text-sm my-2">${escapeHtml(line.slice(2))}</blockquote>`;
-      if (line.startsWith("```")) return `<pre class="bg-zinc-800 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto my-2 font-mono">`;
+        return `<blockquote class="border-l-2 border-amber-500/50 pl-3 text-zinc-300 italic text-sm my-2">${escapeHtml(line.slice(2))}</blockquote>`;
+      if (line.startsWith("```")) return `<pre class="bg-zinc-800 rounded-lg p-3 text-sm text-zinc-300 overflow-x-auto my-2 font-mono">`;
       if (line.trim() === "") return "<br />";
       if (/^`[^`]+`$/.test(line.trim()))
-        return `<code class="bg-zinc-800 px-1.5 py-0.5 rounded text-xs text-amber-400 font-mono">${escapeHtml(line.trim().slice(1, -1))}</code>`;
-      return `<p class="text-sm text-zinc-400 my-1">${safe}</p>`;
+        return `<code class="bg-zinc-800 px-1.5 py-0.5 rounded text-sm text-amber-400 font-mono">${escapeHtml(line.trim().slice(1, -1))}</code>`;
+      return `<p class="text-sm text-zinc-300 my-1">${safe}</p>`;
     })
     .join("\n");
 }
@@ -60,11 +60,11 @@ export default function Skills() {
     <div className="max-w-4xl mx-auto space-y-6" data-testid="skills">
       <div>
         <h2 className="text-2xl font-bold text-zinc-100">Skills</h2>
-        <p className="text-sm text-zinc-500 mt-1">Available MCP skills and instructions</p>
+        <p className="text-sm text-zinc-300 mt-1">Available MCP skills and instructions</p>
       </div>
 
       {skills.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
+        <div className="flex flex-col items-center justify-center py-20 text-zinc-300">
           <BookOpen size={48} className="mb-3 opacity-50" />
           <p className="text-sm">No skills available</p>
         </div>
@@ -91,10 +91,10 @@ export default function Skills() {
                     </div>
                     <div className="text-left">
                       <p className="text-sm font-medium text-zinc-100">{skill.name}</p>
-                      {skill.description && <p className="text-xs text-zinc-500 mt-0.5">{skill.description}</p>}
+                      {skill.description && <p className="text-sm text-zinc-300 mt-0.5">{skill.description}</p>}
                     </div>
                   </div>
-                  {isExpanded ? <ChevronDown size={16} className="text-zinc-500" /> : <ChevronRight size={16} className="text-zinc-500" />}
+                  {isExpanded ? <ChevronDown size={16} className="text-zinc-300" /> : <ChevronRight size={16} className="text-zinc-300" />}
                 </button>
 
                 {isExpanded && (
@@ -108,7 +108,7 @@ export default function Skills() {
                       // biome-ignore lint/security/noDangerouslySetInnerHtml: content is HTML-escaped by renderMarkdown before injection
                       <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
                     ) : (
-                      <p className="text-sm text-zinc-500">No content</p>
+                      <p className="text-sm text-zinc-300">No content</p>
                     )}
                   </div>
                 )}

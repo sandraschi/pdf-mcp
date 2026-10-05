@@ -24,7 +24,7 @@ function KpiCard({ label, icon: Icon, value, testid }: { label: string; icon: ty
         <Icon size={24} className="text-amber-500" />
       </div>
       <div>
-        <p className="text-xs text-zinc-500 uppercase tracking-wider">{label}</p>
+        <p className="text-sm text-zinc-300 uppercase tracking-wider">{label}</p>
         <p className="text-xl font-semibold text-zinc-100 mt-1">
           {value ?? <span className="inline-block w-16 h-5 bg-zinc-800 rounded animate-pulse" />}
         </p>
@@ -58,7 +58,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-zinc-100">Dashboard</h2>
-          <p className="text-sm text-zinc-500 mt-1">Overview of the pdf-mcp server</p>
+          <p className="text-sm text-zinc-300 mt-1">Overview of the pdf-mcp server</p>
         </div>
         <BackendDot />
       </div>
@@ -68,7 +68,7 @@ export default function Dashboard() {
         data-testid="dashboard-hero"
       >
         <h3 className="text-lg font-semibold text-zinc-100">PDF intelligence, locally</h3>
-        <p className="text-sm text-zinc-400 mt-2 max-w-2xl">
+        <p className="text-sm text-zinc-300 mt-2 max-w-2xl">
           Extract, manipulate, annotate, convert, validate, and RAG-search PDFs. Everything runs on your machine — the only optional extra
           is a local LLM (Ollama / LM Studio) for chat, auto-fill, and the <span className="font-mono">pdf_do</span> agent.
         </p>
@@ -109,7 +109,7 @@ export default function Dashboard() {
       {backendOk === false && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center" data-testid="backend-offline-banner">
           <p className="text-red-400 font-medium">Backend is offline</p>
-          <p className="text-zinc-500 text-sm mt-1">Start the backend server to access all features</p>
+          <p className="text-zinc-300 text-sm mt-1">Start the backend server to access all features</p>
         </div>
       )}
 
@@ -121,7 +121,7 @@ export default function Dashboard() {
           <Cpu size={20} className="text-amber-500 mt-0.5 shrink-0" />
           <div>
             <p className="text-amber-400 font-medium">No local LLM detected</p>
-            <p className="text-zinc-400 text-sm mt-1">
+            <p className="text-zinc-300 text-sm mt-1">
               Start <span className="font-mono">ollama serve</span> or LM Studio to enable AI chat with RAG context. The PDF tooling works
               without it.
             </p>
@@ -137,16 +137,16 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 size={16} className="text-amber-500" />
             <h3 className="text-lg font-semibold text-zinc-100">Usage</h3>
-            <span className="text-xs text-zinc-500 ml-auto">
+            <span className="text-sm text-zinc-300 ml-auto">
               {stats.total_jobs} jobs · {stats.total_files} files
             </span>
           </div>
           {stats.operations.length === 0 ? (
-            <p className="text-sm text-zinc-500">No operations run yet in this session.</p>
+            <p className="text-sm text-zinc-300">No operations run yet in this session.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wider">
+                <tr className="border-b border-zinc-800 text-zinc-300 text-sm uppercase tracking-wider">
                   <th className="text-left py-2 font-medium">Operation</th>
                   <th className="text-right py-2 font-medium">Count</th>
                   <th className="text-right py-2 font-medium">Avg (ms)</th>
@@ -157,7 +157,7 @@ export default function Dashboard() {
                   <tr key={op.operation} className="border-b border-zinc-800/40">
                     <td className="py-2 text-zinc-300">{op.operation}</td>
                     <td className="py-2 text-right text-zinc-300">{op.count}</td>
-                    <td className="py-2 text-right text-zinc-500">{Math.round(op.avg_ms)}</td>
+                    <td className="py-2 text-right text-zinc-300">{Math.round(op.avg_ms)}</td>
                   </tr>
                 ))}
               </tbody>

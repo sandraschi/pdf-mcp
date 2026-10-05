@@ -254,10 +254,10 @@ export default function Workbench() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-2xl font-bold text-zinc-100">Workbench</h2>
-          <p className="text-sm text-zinc-500 mt-1">View, compare, and process PDF documents</p>
+          <p className="text-sm text-zinc-300 mt-1">View, compare, and process PDF documents</p>
         </div>
         {jumpHint && (
-          <span className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
+          <span className="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
             Linked from chat - upload to view page
           </span>
         )}
@@ -272,7 +272,7 @@ export default function Workbench() {
           <div className="space-y-3">
             <FileText size={40} className="mx-auto text-amber-500" />
             <p className="text-zinc-100 font-medium">{file.name}</p>
-            <p className="text-sm text-zinc-500">{(file.size / 1024).toFixed(0)} KB</p>
+            <p className="text-sm text-zinc-300">{(file.size / 1024).toFixed(0)} KB</p>
             <div className="flex gap-2 justify-center">
               <button
                 type="button"
@@ -311,8 +311,8 @@ export default function Workbench() {
           </div>
         ) : (
           <div className="space-y-3">
-            <Upload size={40} className="mx-auto text-zinc-600" />
-            <p className="text-zinc-400">Drop a PDF here or click to browse</p>
+            <Upload size={40} className="mx-auto text-zinc-300" />
+            <p className="text-zinc-300">Drop a PDF here or click to browse</p>
             <label className="inline-block px-4 py-2 bg-amber-500 text-black rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors cursor-pointer">
               Select File
               <input
@@ -334,7 +334,7 @@ export default function Workbench() {
           <div className="flex-1 grid grid-cols-1 gap-4 min-w-0" style={compare ? { gridTemplateColumns: "1fr 1fr" } : undefined}>
             <div className="flex flex-col min-h-0 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden" data-testid="pdf-viewer">
               <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between">
-                <p className="text-xs text-zinc-400 truncate">{file?.name}</p>
+                <p className="text-sm text-zinc-300 truncate">{file?.name}</p>
                 {analysis && (
                   <span
                     className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
@@ -350,7 +350,7 @@ export default function Workbench() {
                 {fileUrl ? (
                   <>
                     <canvas ref={canvasRef} className="max-w-full h-auto shadow-lg rounded" />
-                    <div className="flex items-center gap-3 text-sm text-zinc-400">
+                    <div className="flex items-center gap-3 text-sm text-zinc-300">
                       <button
                         type="button"
                         disabled={pageNum <= 1}
@@ -393,9 +393,9 @@ export default function Workbench() {
               >
                 <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-2">
                   {compareFile ? (
-                    <p className="text-xs text-zinc-400 truncate">{compareFile.name}</p>
+                    <p className="text-sm text-zinc-300 truncate">{compareFile.name}</p>
                   ) : (
-                    <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-400">
+                    <label className="flex items-center gap-1.5 text-sm text-zinc-300 cursor-pointer hover:text-amber-400">
                       <Upload size={12} /> Choose second PDF
                       <input
                         type="file"
@@ -422,7 +422,7 @@ export default function Workbench() {
                 <div className="flex-1 p-4 overflow-auto flex flex-col items-center gap-2">
                   <canvas ref={canvasBRef} className="max-w-full h-auto shadow-lg rounded" />
                   {compareResult && (
-                    <pre className="w-full text-[11px] text-zinc-400 whitespace-pre-wrap bg-zinc-800/60 rounded p-2 max-h-40 overflow-auto">
+                    <pre className="w-full text-[11px] text-zinc-300 whitespace-pre-wrap bg-zinc-800/60 rounded p-2 max-h-40 overflow-auto">
                       {compareResult}
                     </pre>
                   )}
@@ -438,8 +438,8 @@ export default function Workbench() {
                   type="button"
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
-                    activeTab === tab.id ? "text-amber-500 border-b-2 border-amber-500" : "text-zinc-500 hover:text-zinc-300"
+                  className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === tab.id ? "text-amber-500 border-b-2 border-amber-500" : "text-zinc-300 hover:text-zinc-300"
                   }`}
                 >
                   <tab.icon size={14} className="mx-auto mb-1" />
@@ -457,12 +457,12 @@ export default function Workbench() {
                     key={tool.id}
                     disabled={runningTool !== null}
                     onClick={() => handleTool(tool.id, tool.label)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors disabled:opacity-40"
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors disabled:opacity-40"
                   >
                     {runningTool === tool.id ? (
                       <Loader2 size={16} className="text-amber-500 animate-spin" />
                     ) : (
-                      <tool.icon size={16} className="text-zinc-500" />
+                      <tool.icon size={16} className="text-zinc-300" />
                     )}
                     {tool.label}
                   </button>
@@ -474,7 +474,7 @@ export default function Workbench() {
 
       {toolResult && (
         <div className="mt-4 bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
-          <pre className="text-sm text-zinc-400 whitespace-pre-wrap">{toolResult}</pre>
+          <pre className="text-sm text-zinc-300 whitespace-pre-wrap">{toolResult}</pre>
           {resultJobId && (
             <a
               href={`${API_BASE}/api/pdf/${resultJobId}/result`}
