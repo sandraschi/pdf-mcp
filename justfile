@@ -8,9 +8,9 @@ default: serve
 serve:
     uv run python run_server.py
 
-# Start webapp dev server
-dev: serve-webapp
-    echo "Backend + frontend both running"
+# Start backend + frontend (both) via the fleet launcher
+dev:
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File start.ps1
 
 serve-webapp:
     bun run --cwd webapp dev

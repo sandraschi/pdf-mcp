@@ -518,6 +518,29 @@ def create_http_app():
         tools = await mcp.list_tools()
         return JSONResponse([_tool_json(t) for t in tools])
 
+    async def capabilities(request: Request) -> JSONResponse:
+        tools = await mcp.list_tools()
+        try:
+            prompts = [p.name for p in await mcp.list_prompts()]
+        except Exception:
+            prompts = []
+        try:
+            resources = [str(r.uri) for r in await mcp.list_resources()]
+        except Exception:
+            resources = []
+        return JSONResponse(
+            {
+                "server": cfg.server_name,
+                "version": cfg.version,
+                "tool_count": len(tools),
+                "tools": [t.name for t in tools],
+                "prompts": prompts,
+                "resources": resources,
+                "features": {"rag": True, "llm": True, "webhooks": True, "transport": ["stdio", "http"]},
+                "ports": {"backend": cfg.port, "frontend": cfg.frontend_port},
+            }
+        )
+
     async def list_skills(request: Request) -> JSONResponse:
         skills_dir = Path(__file__).resolve().parent / "skills"
         skills = []
@@ -843,6 +866,7 @@ def create_http_app():
         return JSONResponse(watch_state)
 
     app.add_route("/api/health", health)
+    app.add_route("/api/capabilities", capabilities)
     app.add_route("/api/v1/diagnostics", diagnostics)
     app.add_route("/api/tools", list_tools)
     app.add_route("/api/skills", list_skills)
