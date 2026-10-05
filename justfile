@@ -76,6 +76,6 @@ cua-webapp-test:
 cua-nsis-test:
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/just/cua-nsis-test.ps1
 
-# Package an MCPB bundle (requires @anthropic-ai/mcpb CLI)
+# Package an MCPB bundle — fresh-stage source into mcpb/ first (MCPB_PACKAGING_STANDARDS.md §2.5)
 mcpb-pack:
-    npx @anthropic-ai/mcpb pack . dist/pdf-mcp-0.2.1.mcpb
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/mcpb-pack.ps1

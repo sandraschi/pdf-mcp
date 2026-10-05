@@ -1,0 +1,53 @@
+{
+  "manifest_version": "0.2",
+  "name": "pdf-mcp",
+  "version": "0.2.1",
+  "description": "Full-stack PDF intelligence MCP server — extract, manipulate, annotate, convert, validate, redact, classify, and RAG-search PDFs, with an agentic pdf_do tool.",
+  "author": {
+    "name": "Sandra Schipal"
+  },
+  "server": {
+    "type": "python",
+    "entry_point": "src/pdf_mcp/server.py",
+    "mcp_config": {
+      "command": "python",
+      "args": ["-m", "pdf_mcp.server"],
+      "env": {
+        "PYTHONPATH": "${PWD}/src",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  },
+  "user_config": {
+    "upload_dir": {
+      "type": "string",
+      "title": "Upload directory",
+      "description": "Where uploaded PDFs and generated outputs are stored.",
+      "default": ""
+    },
+    "rag_store_path": {
+      "type": "string",
+      "title": "LanceDB RAG store path",
+      "description": "Directory for the LanceDB vector store used by pdf_rag.",
+      "default": ""
+    }
+  },
+  "tools": [
+    { "name": "pdf_extract", "description": "Extract text, images, tables, metadata, fonts, links, and outline from a PDF." },
+    { "name": "pdf_manipulate", "description": "Merge, split, rotate, reorder, delete pages, compress, encrypt, decrypt, optimize." },
+    { "name": "pdf_annotate", "description": "Watermark, stamp, highlight, underline, header/footer, page numbers, LLM summary box." },
+    { "name": "pdf_forms", "description": "List, fill, flatten, and export AcroForm fields; LLM-guided auto-fill." },
+    { "name": "pdf_convert", "description": "Convert PDF to/from Markdown, HTML, and images." },
+    { "name": "pdf_validate", "description": "PDF/A, structure, accessibility, integrity checks and two-file compare." },
+    { "name": "pdf_rag", "description": "Chunk, index (LanceDB), semantic search, query-by-example, synthesis, list/delete." },
+    { "name": "pdf_analyze", "description": "Detect scanned vs digital PDFs with per-page layout statistics." },
+    { "name": "pdf_redact", "description": "Blacken sensitive terms and PII patterns (email, phone, IBAN, card, SSN, IP)." },
+    { "name": "pdf_classify", "description": "Classify document type (invoice, receipt, report, contract, form, resume, ...)." },
+    { "name": "pdf_dedupe", "description": "Detect exact and near-duplicate PDFs by content fingerprint." },
+    { "name": "pdf_export", "description": "Build a reusable document brief (Markdown or JSON) with optional LLM summary." },
+    { "name": "pdf_do", "description": "Chain the PDF tools autonomously from a natural-language task (needs a local LLM)." },
+    { "name": "pdf_help", "description": "List tools, or get the input schema for one tool." },
+    { "name": "pdf_status", "description": "Server status: version, uptime, tool count, mode." },
+    { "name": "pdf_shutdown", "description": "Gracefully stop the server." }
+  ]
+}
