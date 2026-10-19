@@ -12,6 +12,9 @@ class Config:
     repo_root: Path = Path(__file__).resolve().parent.parent
     upload_dir: Path = Path(os.getenv("UPLOAD_DIR", str(repo_root / "data" / "uploads")))
     rag_store_path: Path = Path(os.getenv("RAG_STORE_PATH", str(repo_root / "data" / "lancedb")))
+    pdfcraft_cli: Path = Path(os.getenv("PDFCRAFT_CLI", r"C:\Program Files\PdfCraft\pdfcraft-cli.exe"))
+    pdfcraft_outbox: Path = Path(os.getenv("PDFCRAFT_OUTBOX", str(repo_root / "data" / "pdfcraft")))
+    pdfcraft_enabled: bool = os.getenv("PDFCRAFT_ENABLED", "1").lower() not in ("0", "false", "no")
 
     # RAG
     rag_embedding_url: str | None = os.getenv("RAG_EMBEDDING_URL") or None
@@ -28,6 +31,7 @@ class Config:
     def ensure_dirs(self) -> None:
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.rag_store_path.mkdir(parents=True, exist_ok=True)
+        self.pdfcraft_outbox.mkdir(parents=True, exist_ok=True)
 
 
 cfg = Config()
